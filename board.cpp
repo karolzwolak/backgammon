@@ -1,4 +1,3 @@
-/* #include <curses.h> */
 #include <ncurses.h>
 
 struct Board {
@@ -37,4 +36,20 @@ Board new_board(int height, int width) {
   refresh_win(win);
 
   return Board{height, width, win};
+}
+
+void print_board(Board *board) {
+  for (int i = 0; i < 6; i++) {
+    mvwaddstr(board->win, 1 + i, 2,
+              "| |   \\ /   | |   \\ /   | |   \\ /   ---   "
+              "| |   \\ /   | |   \\ /   | |   \\ /");
+    mvwaddstr(board->win, 1 + 6 + i, 2,
+              "                                    ---   "
+              "                                 ");
+    mvwaddstr(board->win, board->win_height - 2 - i, 2,
+              "/ \\   | |   / \\   | |   / \\   | |   ---   "
+              "/ \\   | |   / \\   | |   / \\   | |");
+  }
+
+  refresh_win(board->win);
 }
