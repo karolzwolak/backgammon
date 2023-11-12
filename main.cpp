@@ -1,16 +1,32 @@
 #include "board.cpp"
 #include <ncurses.h>
 
-const int WIN_HEIGHT = 20;
-const int WIN_WIDTH = 79;
+/* const int WIN_HEIGHT = 20; */
+/* const int WIN_WIDTH = 79; */
+
+const int BOARD_HEIGHT = 13 + 2;
+const int BOARD_WIDTH = 51 + 4;
+
+void init_ncurses() {
+  initscr();
+  refresh();
+}
+
+void cleanup_ncurses() { endwin(); }
 
 int main() {
-  Board board = new_board(WIN_HEIGHT, WIN_WIDTH);
+  init_ncurses();
 
-  print_board(&board);
+  WinWrapper content_win =
+      new_win_wrapper_at_center(BOARD_HEIGHT, BOARD_WIDTH, true);
+
+  Board board = new_board();
+
+  display_board(&board, &content_win);
+
   getch();
 
-  cleanup_board();
+  cleanup_ncurses();
 
   return 0;
 }

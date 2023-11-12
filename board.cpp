@@ -1,55 +1,41 @@
+#include "window.cpp"
 #include <ncurses.h>
 
-struct Board {
-  int win_height;
-  int win_width;
-  WINDOW *win;
-};
-void cleanup_board() { endwin(); }
+struct Board {};
 
-void add_border(WINDOW *win) { box(win, 0, 0); }
+Board new_board() { return Board{}; }
 
-void clear_win(WINDOW *win) {
-  wclear(win);
-  add_border(win);
-}
+void print_board(Board *board, WinWrapper *win_wrapper) {
+  WINDOW *win = win_wrapper->win;
 
-void refresh_win(WINDOW *win) { wrefresh(win); }
+  mvwaddstr(win, 1, 2, "12  11  10  9   8   7   | |   6   5   4   3   2   1");
+  mvwaddstr(win, 7, 2, "---------------------- [BAR] ----------------------");
+  mvwaddstr(win, 13, 2, "13  14  15  16  17  18  | |  19  20  21  22  23  24");
 
-WINDOW *create_win(int height, int width) {
-  initscr();
-  refresh();
-
-  int x_max, y_max;
-  getmaxyx(stdscr, y_max, x_max);
-
-  int y_start = (y_max / 2) - (height / 2);
-  int x_start = (x_max / 2) - (width / 2);
-
-  return newwin(height, width, y_start, x_start);
-}
-
-Board new_board(int height, int width) {
-  WINDOW *win = create_win(height, width);
-
-  clear_win(win);
-  refresh_win(win);
-
-  return Board{height, width, win};
-}
-
-void print_board(Board *board) {
-  for (int i = 0; i < 6; i++) {
-    mvwaddstr(board->win, 1 + i, 2,
-              "| |   \\ /   | |   \\ /   | |   \\ /   ---   "
-              "| |   \\ /   | |   \\ /   | |   \\ /");
-    mvwaddstr(board->win, 1 + 6 + i, 2,
-              "                                    ---   "
-              "                                 ");
-    mvwaddstr(board->win, board->win_height - 2 - i, 2,
-              "/ \\   | |   / \\   | |   / \\   | |   ---   "
-              "/ \\   | |   / \\   | |   / \\   | |");
+  for (int i = 0; i < 5; i++) {
+    mvwaddstr(win, 12 - i, 6 * 4 + 2, "| |");
+    mvwaddstr(win, 2 + i, 6 * 4 + 2, "| |");
   }
-
-  refresh_win(board->win);
 }
+
+void display_board(Board *board, WinWrapper *win_wrapper) {
+  clear_win(win_wrapper);
+  print_board(board, win_wrapper);
+  refresh_win(win_wrapper->win);
+}
+
+/* void print_board(Board *board) { */
+/*   for (int i = 0; i < 6; i++) { */
+/*     mvwaddstr(board->win, 1 + i, 2, */
+/*               "| |   \\ /   | |   \\ /   | |   \\ /   ---   " */
+/*               "| |   \\ /   | |   \\ /   | |   \\ /"); */
+/*     mvwaddstr(board->win, 1 + 6 + i, 2, */
+/*               "                                    ---   " */
+/*               "                                 "); */
+/*     mvwaddstr(board->win, board->win_height - 2 - i, 2, */
+/*               "/ \\   | |   / \\   | |   / \\   | |   ---   " */
+/*               "/ \\   | |   / \\   | |   / \\   | |"); */
+/*   } */
+/**/
+/*   refresh_win(board->win); */
+/* } */
