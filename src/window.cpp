@@ -1,11 +1,5 @@
+#include "../headers/window.hpp"
 #include <ncurses.h>
-
-struct WinWrapper {
-  int width, height;
-  int y_start, x_start;
-  bool has_border;
-  WINDOW *win;
-};
 
 WinWrapper new_win_wrapper(int height, int width, int y_start, int x_start,
                            bool has_border) {
@@ -23,15 +17,20 @@ WinWrapper new_win_wrapper_at_center(int height, int width, bool has_border) {
   return new_win_wrapper(height, width, y_start, x_start, has_border);
 }
 
-void win_border(WINDOW *win) { box(win, 0, 0); }
-void refresh_win(WINDOW *win) { wrefresh(win); }
-
 void clear_win(WinWrapper *win_wrapper) {
   wclear(win_wrapper->win);
   if (win_wrapper->has_border)
     win_border(win_wrapper->win);
 }
 
-void print_str_at(WINDOW *win, int y, int x, const char *str) {
-  mvwaddstr(win, y, x, str);
+void print_centered_str(WinWrapper *win_wrapper, int y, const char *str) {
+  int str_len = sizeof str - 1;
+  if (str_len <= 0)
+    return;
+
+  int margin = (win_wrapper->width - str_len) / 2;
+  mvwaddstr(win_wrapper->win, y, margin + 1, str);
 }
+
+void win_border(WINDOW *win) { box(win, 0, 0); }
+void refresh_win(WINDOW *win) { wrefresh(win); }

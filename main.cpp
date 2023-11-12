@@ -1,8 +1,6 @@
-#include "board.cpp"
+#include "src/board.cpp"
+#include "src/window.cpp"
 #include <ncurses.h>
-
-/* const int WIN_HEIGHT = 20; */
-/* const int WIN_WIDTH = 79; */
 
 const int BOARD_HEIGHT = 13 + 2;
 const int BOARD_WIDTH = 51 + 4;

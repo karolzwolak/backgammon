@@ -1,4 +1,4 @@
-#include "window.cpp"
+#include "../headers/window.hpp"
 #include <ncurses.h>
 
 struct Board {};
@@ -23,19 +23,3 @@ void display_board(Board *board, WinWrapper *win_wrapper) {
   print_board(board, win_wrapper);
   refresh_win(win_wrapper->win);
 }
-
-/* void print_board(Board *board) { */
-/*   for (int i = 0; i < 6; i++) { */
-/*     mvwaddstr(board->win, 1 + i, 2, */
-/*               "| |   \\ /   | |   \\ /   | |   \\ /   ---   " */
-/*               "| |   \\ /   | |   \\ /   | |   \\ /"); */
-/*     mvwaddstr(board->win, 1 + 6 + i, 2, */
-/*               "                                    ---   " */
-/*               "                                 "); */
-/*     mvwaddstr(board->win, board->win_height - 2 - i, 2, */
-/*               "/ \\   | |   / \\   | |   / \\   | |   ---   " */
-/*               "/ \\   | |   / \\   | |   / \\   | |"); */
-/*   } */
-/**/
-/*   refresh_win(board->win); */
-/* } */
