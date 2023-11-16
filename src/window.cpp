@@ -1,4 +1,5 @@
 #include "../headers/window.hpp"
+#include <cctype>
 #include <curses.h>
 #include <ncurses.h>
 #include <string>
@@ -53,3 +54,8 @@ void mv_print_colored(WinWrapper *win_wrapper, int y, int x, std::string &str,
 
 void win_border(WINDOW *win) { box(win, 0, 0); }
 void refresh_win(WINDOW *win) { wrefresh(win); }
+
+char char_input() {
+  char inp = getch();
+  return tolower(inp);
+}

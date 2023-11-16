@@ -1,4 +1,5 @@
 #include "src/board.cpp"
+#include "src/menu.cpp"
 #include "src/window.cpp"
 #include <ncurses.h>
 
@@ -18,11 +19,11 @@ int main() {
   WinWrapper content_win =
       new_win_wrapper_at_center(BOARD_HEIGHT, BOARD_WIDTH, true);
 
-  Board board = new_board();
+  menu_loop(&content_win);
 
-  display_board(&board, &content_win);
-
-  getch();
+  /* Board board = new_board(); */
+  /**/
+  /* display_board(&board, &content_win); */
 
   cleanup_ncurses();
 
