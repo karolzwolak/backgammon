@@ -25,10 +25,10 @@ void clear_win(WinWrapper *win_wrapper) {
     win_border(win_wrapper->win);
 }
 
-void print(WinWrapper *win_wrapper, std::string str) {
+void print(WinWrapper *win_wrapper, std::string &str) {
   waddstr(win_wrapper->win, str.c_str());
 }
-void print_colored(WinWrapper *win_wrapper, std::string str, int fg_color,
+void print_colored(WinWrapper *win_wrapper, std::string &str, int fg_color,
                    int bg_color) {
   attron(fg_color);
   attron(bg_color);
@@ -36,20 +36,16 @@ void print_colored(WinWrapper *win_wrapper, std::string str, int fg_color,
   attroff(fg_color);
   attroff(bg_color);
 }
-void mv_print_str(WinWrapper *win_wrapper, int y, int x, std::string str) {
+void mv_print_str(WinWrapper *win_wrapper, int y, int x, std::string &str) {
   wmove(win_wrapper->win, y, x);
   print(win_wrapper, str);
 }
 
-void mv_print_centered(WinWrapper *win_wrapper, int y, std::string str) {
-  int str_len = sizeof str - 1;
-  if (str_len <= 0)
-    return;
-
-  int margin = (win_wrapper->width - str_len) / 2;
+void mv_print_centered(WinWrapper *win_wrapper, int y, std::string &str) {
+  int margin = (win_wrapper->width - str.length()) / 2;
   mv_print_str(win_wrapper, y, margin + 1, str);
 }
-void mv_print_colored(WinWrapper *win_wrapper, int y, int x, std::string str,
+void mv_print_colored(WinWrapper *win_wrapper, int y, int x, std::string &str,
                       int fg_color = A_NORMAL, int bg_color = A_NORMAL) {
   wmove(win_wrapper->win, y, x);
   print_colored(win_wrapper, str, fg_color, bg_color);
