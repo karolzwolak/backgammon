@@ -4,7 +4,6 @@
 #include "window.cpp"
 #include <curses.h>
 #include <ncurses.h>
-#include <string>
 
 const int VERTICAL_MARGIN = 2;
 const int IN_BETWEEN_LINES_MARGIN = 1;
@@ -74,7 +73,7 @@ void add_main_border(WinWrapper *main_win) {
   refresh_win(main_win->win);
 }
 
-void print_line(WinWrapper *win_wrapper, int *line, std::string str) {
+void print_line(WinWrapper *win_wrapper, int *line, const char *str) {
   mv_print_centered(win_wrapper, *line, str);
   *line += IN_BETWEEN_LINES_MARGIN + 1;
 }
@@ -118,7 +117,7 @@ void menu_loop(WinManager *win_manager) {
   }
 }
 
-void test_print(WinWrapper *win_wrapper, std::string str) {
+void test_print(WinWrapper *win_wrapper, const char *str) {
   clear_win(win_wrapper);
   mv_print_centered(win_wrapper, 1, str);
   refresh_win(win_wrapper->win);
