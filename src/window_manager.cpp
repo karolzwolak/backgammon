@@ -1,8 +1,8 @@
 #include "../headers/window_manager.hpp"
+#include "../headers/game.hpp"
 #include "../headers/window.hpp"
-#include "board.cpp"
+#include "game.cpp"
 #include "window.cpp"
-#include <curses.h>
 #include <ncurses.h>
 
 const int VERTICAL_MARGIN = 2;
@@ -27,11 +27,6 @@ const int IO_WIN_WIDTH = ABOUT_WIN_WIDTH;
 const int MIN_WIDTH = ABOUT_WIN_WIDTH + 2 * WIN_HORIZONTAL_MARGIN + 2;
 const int MIN_HEIGHT = ABOUT_WIN_HEIGHT + BOARD_HEIGHT + IO_WIN_HEIGHT +
                        4 * WIN_VERTICAL_MARGIN + 2;
-
-struct WinManager {
-  WinWrapper main_win, about_win, legend_win, content_win, stats_win, io_win;
-  int term_height, term_width;
-};
 
 WinManager new_win_manager() {
   int term_height, term_width;
@@ -111,10 +106,21 @@ void menu_loop(WinManager *win_manager) {
     switch (char_input()) {
     case 'q':
       return;
+    case 'p':
+      game_loop(win_manager);
+      break;
     default:
       break;
     }
   }
+}
+
+void show_about_info(WinWrapper *win_wrapper) {
+  clear_win(win_wrapper);
+  mv_print_centered(
+      win_wrapper, 1,
+      "backgammon game in terminal, made by: Karol Zwolak, id:197883");
+  refresh_win(win_wrapper->win);
 }
 
 void test_print(WinWrapper *win_wrapper, const char *str) {
@@ -125,7 +131,8 @@ void test_print(WinWrapper *win_wrapper, const char *str) {
 
 void debug_menu(WinManager *win_manager) {
   test_print(&win_manager->legend_win, "legend");
-  test_print(&win_manager->about_win, "about");
+  /* test_print(&win_manager->about_win, "about"); */
+  show_about_info(&win_manager->about_win);
   test_print(&win_manager->stats_win, "stats");
   test_print(&win_manager->io_win, "io");
   display_menu(&win_manager->content_win);
@@ -136,9 +143,9 @@ void run() {
 
   add_main_border(&win_manager.main_win);
 
-  debug_menu(&win_manager);
-
-  getch();
+  /* debug_menu(&win_manager); */
+  /* getch(); */
+  menu_loop(&win_manager);
 
   /* menu_loop(&win_manager); */
 }

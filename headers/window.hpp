@@ -16,7 +16,7 @@ void clear_win(WinWrapper *win_wrapper);
 void print(WinWrapper *win_wrapper, const char *str);
 void print_colored(WinWrapper *win_wrapper, const char *str, int fg_color,
                    int bg_color);
-void mv_print(WinWrapper *win_wrapper, int y, int x, const char *str);
+void mv_print_str(WinWrapper *win_wrapper, int y, int x, const char *str);
 void mv_print_colored(WinWrapper *win_wrapper, int y, int x, const char *str,
                       int fg_color, int bg_color);
 void mv_print_centered(WinWrapper *win_wrapper, int y, const char *str);
