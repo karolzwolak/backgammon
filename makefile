@@ -1,5 +1,5 @@
 all: main
 
-main: main.cpp
-	g++ main.cpp -lncurses -o bin -g
+main: main.c
+	gcc main.c -lncurses -o bin -g
 

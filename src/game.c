@@ -1,10 +1,10 @@
-#include "../headers/game.hpp"
-#include "../headers/window.hpp"
-#include "../headers/window_manager.hpp"
+#include "../headers/game.h"
+#include "../headers/window.h"
+#include "../headers/window_manager.h"
 #include <ncurses.h>
 #include <string.h>
 
-const int BOARD_SIZE = 24;
+#define BOARD_SIZE 24
 const int HALF_BOARD = BOARD_SIZE / 2;
 const int QUARTER_BOARD = BOARD_SIZE / 4;
 
@@ -21,7 +21,6 @@ const int BAR_VERTICAL_GAP = 1;
 const int BAR_HORIZONTAL_GAP = 6;
 const int BAR_HORIZONTAL_COMBINED_GAP =
     BAR_HORIZONTAL_GAP - CONTENT_CELL_WIDTH + 1;
-;
 
 const int CONTENT_WIDTH = BOARD_COL_COUNT * CONTENT_CELL_WIDTH +
                           BAR_HORIZONTAL_COMBINED_GAP +
@@ -35,26 +34,30 @@ const int CONTENT_X_START = CONTENT_HORIZONTAL_MARGIN + 1;
 const int CONTENT_X_END = CONTENT_WIDTH - CONTENT_HORIZONTAL_MARGIN;
 const int CONTENT_Y_END = CONTENT_HEIGHT - CONTENT_VERTICAL_MARGIN;
 
-enum PlayerKind { None, White, Red };
+typedef enum { None, White, Red } PlayerKind;
 
-struct Player {
+typedef struct {
   const char *name;
   PlayerKind player_kind;
-};
+} Player;
 
-struct BoardCell {
+typedef struct {
   PlayerKind pawn_player_kind;
   int pawn_count;
-};
+} BoardCell;
 
 bool board_cell_is_empty(BoardCell *board_cell) {
   return board_cell->pawn_count > 0;
 }
 
-BoardCell empty_board_cell() { return BoardCell{None, 0}; }
+BoardCell empty_board_cell() {
+  BoardCell res = {None, 0};
+  return res;
+}
 
 BoardCell new_board_cell(PlayerKind player_kind, int pawn_count) {
-  return BoardCell{player_kind, pawn_count};
+  BoardCell res = {player_kind, pawn_count};
+  return res;
 }
 
 void print_overflowing_pawns(WinWrapper *win_wrapper, BoardCell *board_cell,
@@ -141,11 +144,11 @@ void print_pawns_on_bar(WinWrapper *win_wrapper, BoardCell *board_cell) {
   }
 }
 
-struct Board {
+typedef struct {
   BoardCell board_cells[BOARD_SIZE];
   BoardCell white_player_bar;
   BoardCell red_player_bar;
-};
+} Board;
 
 Board empty_board() {
   BoardCell white_player_bar = empty_board_cell();
@@ -153,7 +156,7 @@ Board empty_board() {
   white_player_bar.pawn_player_kind = White;
   red_player_bar.pawn_player_kind = Red;
 
-  Board board = Board{{}, white_player_bar, red_player_bar};
+  Board board = {{}, white_player_bar, red_player_bar};
 
   for (int i = 0; i < BOARD_SIZE; i++)
     board.board_cells[i] = empty_board_cell();
@@ -187,14 +190,12 @@ Board default_board() {
   return board;
 }
 
-struct GameManager {
+typedef struct {
   Board board;
 
   Player white_player;
   Player red_player;
-};
-
-Board new_board() { return Board{}; }
+} GameManager;
 
 void print_board_ui(WinWrapper *win_wrapper) {
   WINDOW *win = win_wrapper->win;

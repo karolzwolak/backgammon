@@ -1,8 +1,8 @@
-#include "../headers/window_manager.hpp"
-#include "../headers/game.hpp"
-#include "../headers/window.hpp"
-#include "game.cpp"
-#include "window.cpp"
+#include "../headers/window_manager.h"
+#include "../headers/game.h"
+#include "../headers/window.h"
+#include "game.c"
+#include "window.c"
 #include <ncurses.h>
 
 const int VERTICAL_MARGIN = 2;
@@ -61,8 +61,9 @@ WinManager new_win_manager() {
       new_win_wrapper(IO_WIN_HEIGHT, IO_WIN_WIDTH,
                       y_end(&content_win) + WIN_VERTICAL_MARGIN, x_start, true);
 
-  return WinManager{main_win,  about_win, legend_win,  content_win,
+  WinManager res = {main_win,  about_win, legend_win,  content_win,
                     stats_win, io_win,    term_height, term_width};
+  return res;
 }
 
 void add_main_border(WinWrapper *main_win) {
