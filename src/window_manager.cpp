@@ -11,8 +11,10 @@ const int IN_BETWEEN_LINES_MARGIN = 1;
 const int WIN_HORIZONTAL_MARGIN = 2;
 const int WIN_VERTICAL_MARGIN = 1;
 
-const int BOARD_HEIGHT = 13 + 2;
-const int BOARD_WIDTH = 51 + 4;
+/* const int BOARD_HEIGHT = 13 + 2; */
+/* const int BOARD_WIDTH = 51 + 4; */
+const int BOARD_HEIGHT = CONTENT_HEIGHT + 2;
+const int BOARD_WIDTH = CONTENT_WIDTH + 2;
 
 const int SIDE_WIN_WIDTH = 16;
 const int SIDE_WIN_HEIGHT = BOARD_HEIGHT;
