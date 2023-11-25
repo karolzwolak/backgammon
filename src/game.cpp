@@ -66,15 +66,20 @@ void print_overflowing_pawns(WinWrapper *win_wrapper, BoardCell *board_cell,
   mv_print_str(win_wrapper, y, x, out);
 }
 
+void pawn_draw_char(char *out, PlayerKind player_kind) {
+  if (player_kind == Red)
+    sprintf(out, "R");
+  else if (player_kind == White)
+    sprintf(out, "W");
+}
+
 void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
 
-  char out[2] = "";
-  if (board_cell->pawn_player_kind == None)
+  if (board_cell->pawn_count == 0 || board_cell->pawn_player_kind == None)
     return;
-  else if (board_cell->pawn_player_kind == Red)
-    sprintf(out, "R");
-  else
-    sprintf(out, "W");
+
+  char out[2] = "";
+  pawn_draw_char(out, board_cell->pawn_player_kind);
 
   bool on_bottom = id >= HALF_BOARD;
   int y, x, move_by;
@@ -110,12 +115,45 @@ void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
     print_overflowing_pawns(win_wrapper, board_cell, y, x);
 }
 
+void print_pawns_on_bar(WinWrapper *win_wrapper, BoardCell *board_cell) {
+  if (board_cell->pawn_count == 0 || board_cell->pawn_player_kind == None)
+    return;
+
+  char out[2] = "";
+  pawn_draw_char(out, board_cell->pawn_player_kind);
+
+  int start_y, move_dir;
+  if (board_cell->pawn_player_kind == Red) {
+    start_y = CONTENT_Y_START + 1;
+    move_dir = 1;
+
+  } else {
+    start_y = CONTENT_Y_END - 1;
+    move_dir = -1;
+  }
+
+  for (int i = 0; i < board_cell->pawn_count; i++) {
+    int col = i % 3;
+    int row = i / 3;
+
+    mv_print_str(win_wrapper, start_y + row * move_dir, CONTENT_WIDTH / 2 + col,
+                 out);
+  }
+}
+
 struct Board {
   BoardCell board_cells[BOARD_SIZE];
+  BoardCell white_player_bar;
+  BoardCell red_player_bar;
 };
 
 Board empty_board() {
-  Board board = Board{{}};
+  BoardCell white_player_bar = empty_board_cell();
+  BoardCell red_player_bar = empty_board_cell();
+  white_player_bar.pawn_player_kind = White;
+  red_player_bar.pawn_player_kind = Red;
+
+  Board board = Board{{}, white_player_bar, red_player_bar};
 
   for (int i = 0; i < BOARD_SIZE; i++)
     board.board_cells[i] = empty_board_cell();
@@ -126,6 +164,13 @@ Board empty_board() {
 void set_pawns(Board *board, int id, PlayerKind player_kind, int count) {
   board->board_cells[id].pawn_player_kind = player_kind;
   board->board_cells[id].pawn_count = count;
+}
+
+void add_pawn_to_bar(Board *board, PlayerKind player_kind) {
+  if (player_kind == Red)
+    board->red_player_bar.pawn_count++;
+  else if (player_kind == White)
+    board->white_player_bar.pawn_count++;
 }
 
 Board default_board() {
@@ -177,6 +222,8 @@ void print_board_pawns(WinWrapper *win_wrapper, Board *board) {
 void print_board(Board *board, WinWrapper *win_wrapper) {
   print_board_ui(win_wrapper);
   print_board_pawns(win_wrapper, board);
+  print_pawns_on_bar(win_wrapper, &board->red_player_bar);
+  print_pawns_on_bar(win_wrapper, &board->white_player_bar);
 }
 
 void display_board(Board *board, WinWrapper *win_wrapper) {
