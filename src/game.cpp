@@ -2,6 +2,7 @@
 #include "../headers/window.hpp"
 #include "../headers/window_manager.hpp"
 #include <ncurses.h>
+#include <stdio.h>
 
 const int BOARD_SIZE = 24;
 const int HALF_BOARD = BOARD_SIZE / 2;
@@ -57,43 +58,57 @@ BoardCell new_board_cell(PlayerKind player_kind, int pawn_count) {
   return BoardCell{player_kind, pawn_count};
 }
 
-void print_board_cell_top(WinWrapper *win_wrapper, BoardCell *board_cell,
-                          int id) {
-  int y = CONTENT_Y_START + 1;
-  int x = CONTENT_X_END - id * CONTENT_CELL_WIDTH;
+void print_overflowing_pawns(WinWrapper *win_wrapper, BoardCell *board_cell,
+                             int y, int x) {
 
-  if (id >= QUARTER_BOARD)
-    x -= BAR_HORIZONTAL_GAP;
+  char out[3] = "";
 
-  for (int i = 0; i < board_cell->pawn_count; i++) {
-    mv_print_str(win_wrapper, y, x, "*");
-    y += 1;
-  }
-}
-
-void print_board_cell_bot(WinWrapper *win_wrapper, BoardCell *board_cell,
-                          int id) {
-  id = id % 12;
-  int y = CONTENT_Y_END - 1;
-  int x = CONTENT_X_START + id * CONTENT_CELL_WIDTH;
-
-  if (id >= QUARTER_BOARD)
-    x += BAR_HORIZONTAL_GAP;
-
-  for (int i = 0; i < board_cell->pawn_count; i++) {
-    mv_print_str(win_wrapper, y, x, "*");
-    y -= 1;
-  }
+  sprintf(out, "%02d", board_cell->pawn_count - BOARD_ROW_COUNT);
+  mv_print_str(win_wrapper, y, x, out);
 }
 
 void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
 
-  bool on_top = id < HALF_BOARD;
-  if (!on_top) {
-    print_board_cell_bot(win_wrapper, board_cell, id);
+  char out[2] = "";
+  if (board_cell->pawn_player_kind == None)
     return;
+  else if (board_cell->pawn_player_kind == Red)
+    sprintf(out, "R");
+  else
+    sprintf(out, "W");
+
+  bool on_bottom = id >= HALF_BOARD;
+  int y, x, move_by;
+
+  if (on_bottom) {
+    id = id % 12;
+    y = CONTENT_Y_END - 1;
+    x = CONTENT_X_START + id * CONTENT_CELL_WIDTH;
+    move_by = -1;
+
+    if (id >= QUARTER_BOARD)
+      x += BAR_HORIZONTAL_GAP;
+  } else {
+    y = CONTENT_Y_START + 1;
+    x = CONTENT_X_END - id * CONTENT_CELL_WIDTH;
+    move_by = 1;
+
+    if (id >= QUARTER_BOARD)
+      x -= BAR_HORIZONTAL_GAP;
   }
-  print_board_cell_top(win_wrapper, board_cell, id);
+
+  int draw_count = board_cell->pawn_count;
+  if (draw_count > BOARD_ROW_COUNT)
+    draw_count = BOARD_ROW_COUNT - 1;
+  for (int i = 0; i < draw_count; i++) {
+    mv_print_str(win_wrapper, y, x, out);
+    y += move_by;
+  }
+
+  if (x > CONTENT_WIDTH / 2)
+    x -= 1;
+  if (board_cell->pawn_count > BOARD_ROW_COUNT)
+    print_overflowing_pawns(win_wrapper, board_cell, y, x);
 }
 
 struct Board {
@@ -116,14 +131,13 @@ void set_pawns(Board *board, int id, PlayerKind player_kind, int count) {
 
 Board default_board() {
   Board board = empty_board();
-  /* int default_board_positions[] = {0, 11, 16, 18}; */
-  int default_board_positions[] = {0, 5, 6, 7};
+  int default_board_positions[] = {0, 11, 16, 18};
   int default_board_pawn_counts[] = {2, 5, 3, 5};
 
   for (int i = 0; i < 4; i++) {
     set_pawns(&board, default_board_positions[i], White,
               default_board_pawn_counts[i]);
-    set_pawns(&board, BOARD_SIZE - default_board_positions[i], Red,
+    set_pawns(&board, BOARD_SIZE - default_board_positions[i] - 1, Red,
               default_board_pawn_counts[i]);
   }
   return board;
