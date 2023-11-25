@@ -4,36 +4,6 @@
 #include <ncurses.h>
 #include <string.h>
 
-#define BOARD_SIZE 24
-const int HALF_BOARD = BOARD_SIZE / 2;
-const int QUARTER_BOARD = BOARD_SIZE / 4;
-
-const int CONTENT_HORIZONTAL_MARGIN = 1;
-const int CONTENT_VERTICAL_MARGIN = 0;
-
-// count of rows inside board
-const int BOARD_ROW_COUNT = 5;
-const int BOARD_COL_COUNT = BOARD_SIZE / 2;
-const int CONTENT_CELL_SPACING = 3;
-const int CONTENT_CELL_WIDTH = CONTENT_CELL_SPACING + 1;
-
-const int BAR_VERTICAL_GAP = 1;
-const int BAR_HORIZONTAL_GAP = 6;
-const int BAR_HORIZONTAL_COMBINED_GAP =
-    BAR_HORIZONTAL_GAP - CONTENT_CELL_WIDTH + 1;
-
-const int CONTENT_WIDTH = BOARD_COL_COUNT * CONTENT_CELL_WIDTH +
-                          BAR_HORIZONTAL_COMBINED_GAP +
-                          2 * CONTENT_HORIZONTAL_MARGIN;
-const int CONTENT_HEIGHT =
-    BOARD_ROW_COUNT * 2 + BAR_VERTICAL_GAP + 2 * CONTENT_VERTICAL_MARGIN + 2;
-
-// content start/end is the first or last index that we can draw characters at
-const int CONTENT_Y_START = CONTENT_VERTICAL_MARGIN + 1;
-const int CONTENT_X_START = CONTENT_HORIZONTAL_MARGIN + 1;
-const int CONTENT_X_END = CONTENT_WIDTH - CONTENT_HORIZONTAL_MARGIN;
-const int CONTENT_Y_END = CONTENT_HEIGHT - CONTENT_VERTICAL_MARGIN;
-
 typedef enum { None, White, Red } PlayerKind;
 
 typedef struct {
@@ -44,28 +14,28 @@ typedef struct {
 typedef struct {
   PlayerKind pawn_player_kind;
   int pawn_count;
-} BoardCell;
+} BoardPoint;
 
-bool board_cell_is_empty(BoardCell *board_cell) {
-  return board_cell->pawn_count > 0;
+bool board_point_is_empty(BoardPoint *board_point) {
+  return board_point->pawn_count > 0;
 }
 
-BoardCell empty_board_cell() {
-  BoardCell res = {None, 0};
+BoardPoint empty_board_point() {
+  BoardPoint res = {None, 0};
   return res;
 }
 
-BoardCell new_board_cell(PlayerKind player_kind, int pawn_count) {
-  BoardCell res = {player_kind, pawn_count};
+BoardPoint new_board_point(PlayerKind player_kind, int pawn_count) {
+  BoardPoint res = {player_kind, pawn_count};
   return res;
 }
 
-void print_overflowing_pawns(WinWrapper *win_wrapper, BoardCell *board_cell,
+void print_overflowing_pawns(WinWrapper *win_wrapper, BoardPoint *board_point,
                              int y, int x) {
 
   char out[3] = "";
 
-  sprintf(out, "%02d", board_cell->pawn_count - BOARD_ROW_COUNT);
+  sprintf(out, "%02d", board_point->pawn_count - BOARD_ROW_COUNT);
   mv_print_str(win_wrapper, y, x, out);
 }
 
@@ -76,13 +46,14 @@ void pawn_draw_char(char *out, PlayerKind player_kind) {
     sprintf(out, "W");
 }
 
-void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
+void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
+                       int id) {
 
-  if (board_cell->pawn_count == 0 || board_cell->pawn_player_kind == None)
+  if (board_point->pawn_count == 0 || board_point->pawn_player_kind == None)
     return;
 
   char out[2] = "";
-  pawn_draw_char(out, board_cell->pawn_player_kind);
+  pawn_draw_char(out, board_point->pawn_player_kind);
 
   bool on_bottom = id >= HALF_BOARD;
   int y, x, move_by;
@@ -90,21 +61,21 @@ void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
   if (on_bottom) {
     id = id % 12;
     y = CONTENT_Y_END - 1;
-    x = CONTENT_X_START + id * CONTENT_CELL_WIDTH;
+    x = CONTENT_X_START + id * BOARD_POINT_WIDTH;
     move_by = -1;
 
     if (id >= QUARTER_BOARD)
       x += BAR_HORIZONTAL_GAP;
   } else {
     y = CONTENT_Y_START + 1;
-    x = CONTENT_X_END - id * CONTENT_CELL_WIDTH;
+    x = CONTENT_X_END - id * BOARD_POINT_WIDTH;
     move_by = 1;
 
     if (id >= QUARTER_BOARD)
       x -= BAR_HORIZONTAL_GAP;
   }
 
-  int draw_count = board_cell->pawn_count;
+  int draw_count = board_point->pawn_count;
   if (draw_count > BOARD_ROW_COUNT)
     draw_count = BOARD_ROW_COUNT - 1;
   for (int i = 0; i < draw_count; i++) {
@@ -112,21 +83,21 @@ void print_board_cell(WinWrapper *win_wrapper, BoardCell *board_cell, int id) {
     y += move_by;
   }
 
-  if (x > CONTENT_WIDTH / 2)
+  if (x > BOARD_WIDTH / 2)
     x -= 1;
-  if (board_cell->pawn_count > BOARD_ROW_COUNT)
-    print_overflowing_pawns(win_wrapper, board_cell, y, x);
+  if (board_point->pawn_count > BOARD_ROW_COUNT)
+    print_overflowing_pawns(win_wrapper, board_point, y, x);
 }
 
-void print_pawns_on_bar(WinWrapper *win_wrapper, BoardCell *board_cell) {
-  if (board_cell->pawn_count == 0 || board_cell->pawn_player_kind == None)
+void print_pawns_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
+  if (board_point->pawn_count == 0 || board_point->pawn_player_kind == None)
     return;
 
   char out[2] = "";
-  pawn_draw_char(out, board_cell->pawn_player_kind);
+  pawn_draw_char(out, board_point->pawn_player_kind);
 
   int start_y, move_dir;
-  if (board_cell->pawn_player_kind == Red) {
+  if (board_point->pawn_player_kind == Red) {
     start_y = CONTENT_Y_START + 1;
     move_dir = 1;
 
@@ -135,38 +106,38 @@ void print_pawns_on_bar(WinWrapper *win_wrapper, BoardCell *board_cell) {
     move_dir = -1;
   }
 
-  for (int i = 0; i < board_cell->pawn_count; i++) {
+  for (int i = 0; i < board_point->pawn_count; i++) {
     int col = i % 3;
     int row = i / 3;
 
-    mv_print_str(win_wrapper, start_y + row * move_dir, CONTENT_WIDTH / 2 + col,
+    mv_print_str(win_wrapper, start_y + row * move_dir, BOARD_WIDTH / 2 + col,
                  out);
   }
 }
 
 typedef struct {
-  BoardCell board_cells[BOARD_SIZE];
-  BoardCell white_player_bar;
-  BoardCell red_player_bar;
+  BoardPoint board_points[BOARD_SIZE];
+  BoardPoint white_player_bar;
+  BoardPoint red_player_bar;
 } Board;
 
 Board empty_board() {
-  BoardCell white_player_bar = empty_board_cell();
-  BoardCell red_player_bar = empty_board_cell();
+  BoardPoint white_player_bar = empty_board_point();
+  BoardPoint red_player_bar = empty_board_point();
   white_player_bar.pawn_player_kind = White;
   red_player_bar.pawn_player_kind = Red;
 
   Board board = {{}, white_player_bar, red_player_bar};
 
   for (int i = 0; i < BOARD_SIZE; i++)
-    board.board_cells[i] = empty_board_cell();
+    board.board_points[i] = empty_board_point();
 
   return board;
 }
 
 void set_pawns(Board *board, int id, PlayerKind player_kind, int count) {
-  board->board_cells[id].pawn_player_kind = player_kind;
-  board->board_cells[id].pawn_count = count;
+  board->board_points[id].pawn_player_kind = player_kind;
+  board->board_points[id].pawn_count = count;
 }
 
 void add_pawn_to_bar(Board *board, PlayerKind player_kind) {
@@ -202,8 +173,7 @@ void print_board_ui(WinWrapper *win_wrapper) {
 
   mv_print_str(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
                "12  11  10  09  08  07 |   | 06  05  04  03  02  01");
-  mv_print_str(win_wrapper, CONTENT_Y_START + CONTENT_HEIGHT / 2,
-               CONTENT_X_START,
+  mv_print_str(win_wrapper, CONTENT_Y_START + BOARD_HEIGHT / 2, CONTENT_X_START,
                "---------------------- |BAR| ----------------------");
   mv_print_str(win_wrapper, CONTENT_Y_END, CONTENT_X_START,
                "13  14  15  16  17  18 |   | 19  20  21  22  23  24");
@@ -216,7 +186,7 @@ void print_board_ui(WinWrapper *win_wrapper) {
 
 void print_board_pawns(WinWrapper *win_wrapper, Board *board) {
   for (int i = 0; i < BOARD_SIZE; i++) {
-    print_board_cell(win_wrapper, &board->board_cells[i], i);
+    print_board_point(win_wrapper, &board->board_points[i], i);
   }
 }
 
