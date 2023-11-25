@@ -84,10 +84,14 @@ void print_menu(WinWrapper *win_wrapper) {
   print_line(win_wrapper, &line, "About");
 }
 
-void display_menu(WinWrapper *win_wrapper) {
+void display_menu_ui(WinWrapper *win_wrapper) {
   clear_win(win_wrapper);
   print_menu(win_wrapper);
   refresh_win(win_wrapper);
+}
+
+void display_menu(WinManager *win_manager) {
+  display_menu_ui(&win_manager->content_win);
 }
 
 void enter_menu() {
@@ -102,14 +106,16 @@ void leave_menu() {
 
 void menu_loop(WinManager *win_manager) {
   enter_menu();
-  display_menu(&win_manager->content_win);
 
   while (true) {
+    display_menu(win_manager);
     switch (char_input()) {
     case 'q':
       return;
     case 'p':
+      leave_menu();
       game_loop(win_manager);
+      enter_menu();
       break;
     default:
       break;
@@ -121,30 +127,14 @@ void show_about_info(WinWrapper *win_wrapper) {
   clear_win(win_wrapper);
   mv_print_centered(
       win_wrapper, 1,
-      "backgammon game in terminal, made by: Karol Zwolak, id:197883");
+      "backgammon game in terminal, made by: Karol Zwolak, id: 197883");
   refresh_win(win_wrapper);
-}
-
-void test_print(WinWrapper *win_wrapper, const char *str) {
-  clear_win(win_wrapper);
-  mv_print_centered(win_wrapper, 1, str);
-  refresh_win(win_wrapper);
-}
-
-void debug_menu(WinManager *win_manager) {
-  test_print(&win_manager->legend_win, "legend");
-  /* test_print(&win_manager->about_win, "about"); */
-  show_about_info(&win_manager->about_win);
-  test_print(&win_manager->stats_win, "stats");
-  test_print(&win_manager->io_win, "io");
-  display_menu(&win_manager->content_win);
 }
 
 void run() {
   WinManager win_manager = new_win_manager();
 
-  /* debug_menu(&win_manager); */
-  /* getch(); */
+  show_about_info(&win_manager.about_win);
   menu_loop(&win_manager);
 
   /* menu_loop(&win_manager); */

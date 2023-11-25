@@ -62,3 +62,8 @@ char char_input() {
   char inp = getch();
   return tolower(inp);
 }
+
+char win_char_input(WinWrapper *win_wrapper) {
+  char inp = wgetch(win_wrapper->win);
+  return tolower(inp);
+}

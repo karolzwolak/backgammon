@@ -25,3 +25,4 @@ void mv_print_centered(WinWrapper *win_wrapper, int y, const char *str);
 void win_border(WINDOW *win);
 
 char char_input();
+char win_char_input(WinWrapper *win_wrapper);

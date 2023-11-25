@@ -2,7 +2,7 @@
 #include "../headers/window.hpp"
 #include "../headers/window_manager.hpp"
 #include <ncurses.h>
-#include <stdio.h>
+#include <string.h>
 
 const int BOARD_SIZE = 24;
 const int HALF_BOARD = BOARD_SIZE / 2;
@@ -231,14 +231,17 @@ void display_board(Board *board, WinWrapper *win_wrapper) {
   print_board(board, win_wrapper);
   refresh_win(win_wrapper);
 }
+
 void game_loop(WinManager *win_manager) {
   Board board = default_board();
 
-  display_board(&board, &win_manager->content_win);
-  /* mv_print_str(&win_manager->content_win, CONTENT_Y_START, CONTENT_X_START,
-   */
-  /*              "*"); */
-  /* mv_print_str(&win_manager->content_win, CONTENT_Y_END, CONTENT_X_END, "*");
-   */
-  refresh_win(&win_manager->content_win);
+  while (true) {
+    display_board(&board, &win_manager->content_win);
+    wmove(win_manager->io_win.win, 2, 1);
+    refresh_win(&win_manager->io_win);
+    switch (win_char_input(&win_manager->io_win)) {
+    case 'q':
+      return;
+    }
+  }
 }
