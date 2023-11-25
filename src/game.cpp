@@ -17,11 +17,10 @@ const int BOARD_COL_COUNT = BOARD_SIZE / 2;
 const int CONTENT_CELL_SPACING = 3;
 const int CONTENT_CELL_WIDTH = CONTENT_CELL_SPACING + 1;
 
-const int BAR_INNER_WIDTH = 1;
 const int BAR_VERTICAL_GAP = 1;
-const int BAR_HORIZONTAL_GAP = 5 + BAR_INNER_WIDTH;
+const int BAR_HORIZONTAL_GAP = 6;
 const int BAR_HORIZONTAL_COMBINED_GAP =
-    2 * CONTENT_CELL_WIDTH - BAR_HORIZONTAL_GAP + BAR_INNER_WIDTH;
+    BAR_HORIZONTAL_GAP - CONTENT_CELL_WIDTH + 1;
 ;
 
 const int CONTENT_WIDTH = BOARD_COL_COUNT * CONTENT_CELL_WIDTH +
@@ -156,16 +155,16 @@ void print_board_ui(WinWrapper *win_wrapper) {
   WINDOW *win = win_wrapper->win;
 
   mv_print_str(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
-               "12  11  10  9   8   7   | |   6   5   4   3   2   1");
+               "12  11  10  09  08  07 |   | 06  05  04  03  02  01");
   mv_print_str(win_wrapper, CONTENT_Y_START + CONTENT_HEIGHT / 2,
                CONTENT_X_START,
-               "---------------------- [BAR] ----------------------");
+               "---------------------- |BAR| ----------------------");
   mv_print_str(win_wrapper, CONTENT_Y_END, CONTENT_X_START,
-               "13  14  15  16  17  18  | |  19  20  21  22  23  24");
+               "13  14  15  16  17  18 |   | 19  20  21  22  23  24");
 
   for (int i = 0; i < BOARD_ROW_COUNT; i++) {
-    mv_print_centered(win_wrapper, CONTENT_Y_START + i + 1, "| |");
-    mv_print_centered(win_wrapper, CONTENT_Y_END - i - 1, "| |");
+    mv_print_centered(win_wrapper, CONTENT_Y_START + i + 1, "|   |");
+    mv_print_centered(win_wrapper, CONTENT_Y_END - i - 1, "|   |");
   }
 }
 
