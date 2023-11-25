@@ -6,7 +6,12 @@
 WinWrapper new_win_wrapper(int height, int width, int y_start, int x_start,
                            bool has_border) {
   WINDOW *win = newwin(height, width, y_start, x_start);
-  return WinWrapper{height, width, y_start, x_start, has_border, win};
+  WinWrapper win_wrapper =
+      WinWrapper{height, width, y_start, x_start, has_border, win};
+  clear_win(&win_wrapper);
+  refresh_win(&win_wrapper);
+
+  return win_wrapper;
 }
 
 int x_end(WinWrapper *win_wrapper) {
@@ -21,6 +26,8 @@ void clear_win(WinWrapper *win_wrapper) {
   if (win_wrapper->has_border)
     win_border(win_wrapper->win);
 }
+
+void refresh_win(WinWrapper *win_wrapper) { wrefresh(win_wrapper->win); }
 
 void print(WinWrapper *win_wrapper, const char *str) {
   waddstr(win_wrapper->win, str);
@@ -50,7 +57,6 @@ void mv_print_colored(WinWrapper *win_wrapper, int y, int x, const char *str,
 }
 
 void win_border(WINDOW *win) { box(win, 0, 0); }
-void refresh_win(WINDOW *win) { wrefresh(win); }
 
 char char_input() {
   char inp = getch();

@@ -67,7 +67,7 @@ WinManager new_win_manager() {
 
 void add_main_border(WinWrapper *main_win) {
   clear_win(main_win);
-  refresh_win(main_win->win);
+  refresh_win(main_win);
 }
 
 void print_line(WinWrapper *win_wrapper, int *line, const char *str) {
@@ -87,7 +87,7 @@ void print_menu(WinWrapper *win_wrapper) {
 void display_menu(WinWrapper *win_wrapper) {
   clear_win(win_wrapper);
   print_menu(win_wrapper);
-  refresh_win(win_wrapper->win);
+  refresh_win(win_wrapper);
 }
 
 void enter_menu() {
@@ -122,13 +122,13 @@ void show_about_info(WinWrapper *win_wrapper) {
   mv_print_centered(
       win_wrapper, 1,
       "backgammon game in terminal, made by: Karol Zwolak, id:197883");
-  refresh_win(win_wrapper->win);
+  refresh_win(win_wrapper);
 }
 
 void test_print(WinWrapper *win_wrapper, const char *str) {
   clear_win(win_wrapper);
   mv_print_centered(win_wrapper, 1, str);
-  refresh_win(win_wrapper->win);
+  refresh_win(win_wrapper);
 }
 
 void debug_menu(WinManager *win_manager) {
@@ -142,8 +142,6 @@ void debug_menu(WinManager *win_manager) {
 
 void run() {
   WinManager win_manager = new_win_manager();
-
-  add_main_border(&win_manager.main_win);
 
   /* debug_menu(&win_manager); */
   /* getch(); */

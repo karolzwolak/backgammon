@@ -229,7 +229,7 @@ void print_board(Board *board, WinWrapper *win_wrapper) {
 void display_board(Board *board, WinWrapper *win_wrapper) {
   clear_win(win_wrapper);
   print_board(board, win_wrapper);
-  refresh_win(win_wrapper->win);
+  refresh_win(win_wrapper);
 }
 void game_loop(WinManager *win_manager) {
   Board board = default_board();
@@ -240,5 +240,5 @@ void game_loop(WinManager *win_manager) {
   /*              "*"); */
   /* mv_print_str(&win_manager->content_win, CONTENT_Y_END, CONTENT_X_END, "*");
    */
-  refresh_win(win_manager->content_win.win);
+  refresh_win(&win_manager->content_win);
 }
