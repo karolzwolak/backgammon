@@ -79,3 +79,35 @@ char win_char_input(WinWrapper *win_wrapper) {
   char inp = wgetch(win_wrapper->win);
   return tolower(inp);
 }
+
+void str_to_lower(char *str) {
+  int len = strlen(str);
+  for (int i = 0; i < len; i++) {
+    str[i] = tolower(str[i]);
+  }
+}
+
+bool check_for_quit_input(char *input) {
+  char copy[strlen(input) + 1];
+  strcpy(copy, input);
+  str_to_lower(copy);
+  return strcmp(copy, "q") == 0 || strcmp(copy, "quit") == 0 ||
+         strcmp(copy, "exit") == 0;
+}
+
+void prompt_input(WinWrapper *io_wrapper, const char *prompt, char *res) {
+  print_centered_on_new_line(io_wrapper, prompt);
+  wscanw(io_wrapper->win, "%" STR(MAX_INPUT_LEN) "s", res);
+  move_rel(io_wrapper, -1, 0);
+}
+
+bool int_prompt_input(WinWrapper *io_wrapper, const char *prompt, int *res) {
+  char input[MAX_INPUT_LEN];
+  prompt_input(io_wrapper, prompt, input);
+  if (check_for_quit_input(input)) {
+    *res = -1;
+    return false;
+  }
+  sscanf(input, "%d", res);
+  return true;
+}
