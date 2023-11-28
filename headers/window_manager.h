@@ -7,3 +7,6 @@ typedef struct {
 } WinManager;
 
 void run();
+
+void disable_cursor();
+void enable_cursor();

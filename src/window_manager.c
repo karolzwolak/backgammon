@@ -94,18 +94,18 @@ void display_menu(WinManager *win_manager) {
   display_menu_ui(&win_manager->content_win);
 }
 
-void enter_menu() {
+void disable_cursor() {
   noecho();
   curs_set(0);
 }
 
-void leave_menu() {
+void enable_cursor() {
   echo();
   curs_set(1);
 }
 
 void menu_loop(WinManager *win_manager) {
-  enter_menu();
+  disable_cursor();
 
   while (true) {
     display_menu(win_manager);
@@ -113,9 +113,9 @@ void menu_loop(WinManager *win_manager) {
     case 'q':
       return;
     case 'p':
-      leave_menu();
+      // enable_cursor();
       game_loop(win_manager);
-      enter_menu();
+      disable_cursor();
       break;
     default:
       break;

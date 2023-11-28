@@ -2,7 +2,6 @@
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
 #include <ncurses.h>
-#include <string.h>
 
 typedef enum { None, White, Red } CheckerKind;
 
@@ -203,14 +202,39 @@ void display_board(Board *board, WinWrapper *win_wrapper) {
   refresh_win(win_wrapper);
 }
 
+int input_int(WinWrapper *io_wrapper, const char *prompt) {
+  print_centered_on_new_line(io_wrapper, prompt);
+  int res = -1;
+  wscanw(io_wrapper->win, "%d", &res);
+  move_rel(io_wrapper, -1, 0);
+  return res;
+}
+
+void clear_io_win(WinWrapper *io_wrapper) {
+  clear_win(io_wrapper);
+  refresh_win(io_wrapper);
+}
+
 void game_loop(WinManager *win_manager) {
   Board board = default_board();
 
+  disable_cursor();
+
+  clear_io_win(&win_manager->io_win);
+
   while (true) {
     display_board(&board, &win_manager->content_win);
-    wmove(win_manager->io_win.win, 2, 1);
-    refresh_win(&win_manager->io_win);
     switch (win_char_input(&win_manager->io_win)) {
+    case 'i':
+      enable_cursor();
+      int res = input_int(&win_manager->io_win, "move from:");
+      while (res == -1) {
+        clear_curr_line(&win_manager->io_win);
+        res = input_int(&win_manager->io_win, "move from:");
+      }
+      clear_io_win(&win_manager->io_win);
+      disable_cursor();
+      break;
     case 'q':
       return;
     }
