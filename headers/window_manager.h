@@ -6,6 +6,8 @@ typedef struct {
   int term_height, term_width;
 } WinManager;
 
+void free_win_manager(WinManager *manager);
+
 void run();
 
 void disable_cursor();

@@ -13,6 +13,8 @@ WinWrapper new_win_wrapper(int height, int width, int y_start, int x_start,
   return win_wrapper;
 }
 
+void free_win_wrapper(WinWrapper *win_wrapper) { delwin(win_wrapper->win); }
+
 int x_end(WinWrapper *win_wrapper) {
   return win_wrapper->width + win_wrapper->x_start;
 }

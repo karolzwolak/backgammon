@@ -4,6 +4,7 @@
 #include "game.c"
 #include "window.c"
 #include <ncurses.h>
+#include <time.h>
 
 const int VERTICAL_MARGIN = 2;
 const int IN_BETWEEN_LINES_MARGIN = 1;
@@ -63,6 +64,15 @@ WinManager new_win_manager() {
   WinManager res = {main_win,  about_win, legend_win,  content_win,
                     stats_win, io_win,    term_height, term_width};
   return res;
+}
+
+void free_win_manager(WinManager *manager) {
+  free_win_wrapper(&manager->main_win);
+  free_win_wrapper(&manager->about_win);
+  free_win_wrapper(&manager->legend_win);
+  free_win_wrapper(&manager->content_win);
+  free_win_wrapper(&manager->stats_win);
+  free_win_wrapper(&manager->io_win);
 }
 
 void add_main_border(WinWrapper *main_win) {
@@ -131,11 +141,15 @@ void show_about_info(WinWrapper *win_wrapper) {
   refresh_win(win_wrapper);
 }
 
+void init_rng() { srand(time(NULL)); }
+
 void run() {
   WinManager win_manager = new_win_manager();
+  init_rng();
 
   show_about_info(&win_manager.about_win);
   menu_loop(&win_manager);
 
   /* menu_loop(&win_manager); */
+  free_win_manager(&win_manager);
 }

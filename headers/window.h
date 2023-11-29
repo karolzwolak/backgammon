@@ -16,6 +16,8 @@ WinWrapper new_win_wrapper(int height, int width, int y_start, int x_start,
                            bool has_border);
 WinWrapper new_win_wrapper_at_center(int height, int width, bool has_border);
 
+void free_win_wrapper(WinWrapper *win_wrapper);
+
 void clear_win(WinWrapper *win_wrapper);
 void refresh_win(WinWrapper *win_wrapper);
 void move_rel(WinWrapper *win_wrapper, int dy, int dx);

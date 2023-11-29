@@ -2,6 +2,8 @@
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
 #include <ncurses.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef enum { None, White, Red } CheckerKind;
 
@@ -167,6 +169,13 @@ typedef struct {
   Player red_player;
 } GameManager;
 
+GameManager new_game_manager(const char *white_name, const char *red_name) {
+  Player white = {white_name, White};
+  Player red = {red_name, Red};
+  GameManager game_manager = {default_board(), white, red};
+  return game_manager;
+}
+
 void print_board_ui(WinWrapper *win_wrapper) {
   WINDOW *win = win_wrapper->win;
 
@@ -210,30 +219,34 @@ int input_int(WinWrapper *io_wrapper, const char *prompt) {
   return res;
 }
 
-void clear_io_win(WinWrapper *io_wrapper) {
-  clear_win(io_wrapper);
-  refresh_win(io_wrapper);
+void clear_refresh_win(WinWrapper *win_wrapper) {
+  clear_win(win_wrapper);
+  refresh_win(win_wrapper);
 }
+
+void init_game(WinManager *win_manager, GameManager *game_manager) {
+  char white_name[MAX_INPUT_LEN];
+  char red_name[MAX_INPUT_LEN];
+
+  prompt_input(&win_manager->io_win, "enter white name: ", white_name);
+  prompt_input(&win_manager->io_win, "enter red name: ", red_name);
+  clear_refresh_win(&win_manager->io_win);
+  *game_manager = new_game_manager(white_name, red_name);
+}
+
+int roll_dice() { return rand() % 6 + 1; }
 
 void game_loop(WinManager *win_manager) {
   Board board = default_board();
 
   disable_cursor();
 
-  clear_io_win(&win_manager->io_win);
+  clear_refresh_win(&win_manager->io_win);
 
   while (true) {
     display_board(&board, &win_manager->content_win);
     switch (win_char_input(&win_manager->io_win)) {
     case 'i':
-      enable_cursor();
-      int res = input_int(&win_manager->io_win, "move from:");
-      while (res == -1) {
-        clear_curr_line(&win_manager->io_win);
-        res = input_int(&win_manager->io_win, "move from:");
-      }
-      clear_io_win(&win_manager->io_win);
-      disable_cursor();
       break;
     case 'q':
       return;
