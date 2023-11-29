@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define WHITE_HOME_START 5
+#define RED_HOME_START BOARD_SIZE - 5
+#define CHECKER_COUNT 15
+
 typedef enum { None, White, Red } CheckerKind;
 
 typedef struct {
@@ -118,17 +122,21 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
 
 typedef struct {
   BoardPoint board_points[BOARD_SIZE];
-  BoardPoint white_player_bar;
-  BoardPoint red_player_bar;
+  BoardPoint white_bar;
+  BoardPoint red_bar;
+
+  int white_removed;
+  int red_removed;
 } Board;
 
 Board empty_board() {
-  BoardPoint white_player_bar = empty_board_point();
-  BoardPoint red_player_bar = empty_board_point();
-  white_player_bar.checker_kind = White;
-  red_player_bar.checker_kind = Red;
+  BoardPoint white_bar = empty_board_point();
+  BoardPoint red_bar = empty_board_point();
 
-  Board board = {{}, white_player_bar, red_player_bar};
+  white_bar.checker_kind = White;
+  red_bar.checker_kind = Red;
+
+  Board board = {{}, white_bar, red_bar, 0, 0};
 
   for (int i = 0; i < BOARD_SIZE; i++)
     board.board_points[i] = empty_board_point();
@@ -143,9 +151,9 @@ void set_checkers(Board *board, int id, CheckerKind checker_kind, int count) {
 
 void add_checker_to_bar(Board *board, CheckerKind checker_kind) {
   if (checker_kind == Red)
-    board->red_player_bar.checker_count++;
+    board->red_bar.checker_count++;
   else if (checker_kind == White)
-    board->white_player_bar.checker_count++;
+    board->white_bar.checker_count++;
 }
 
 Board default_board() {
@@ -160,6 +168,93 @@ Board default_board() {
                  default_board_checker_counts[i]);
   }
   return board;
+}
+
+bool can_player_bear_off(Board *board, CheckerKind checker_kind) {
+  int sum = 0;
+  if (checker_kind == White) {
+    sum += board->white_removed;
+    for (int i = WHITE_HOME_START; i >= 0; i--) {
+      if (board->board_points[i].checker_kind != checker_kind)
+        continue;
+      sum += board->board_points[i].checker_count;
+    }
+  } else {
+    sum += board->red_removed;
+    for (int i = RED_HOME_START; i < BOARD_SIZE; i++) {
+      if (board->board_points[i].checker_kind != checker_kind)
+        continue;
+      sum += board->board_points[i].checker_count;
+    }
+  }
+
+  return sum == CHECKER_COUNT;
+}
+
+bool is_move_legal(Board *board, CheckerKind checker_kind, int from,
+                   int move_by) {
+  if (checker_kind == None ||
+      board->board_points[from].checker_kind != checker_kind)
+    return false;
+
+  int dest = from;
+  if (checker_kind == White) {
+    dest -= move_by;
+  } else {
+    dest += move_by;
+  }
+  if (dest < 0 || dest >= BOARD_SIZE)
+    return can_player_bear_off(board, checker_kind);
+
+  if (board->board_points[dest].checker_kind == checker_kind ||
+      board->board_points[dest].checker_count == 0)
+    return true;
+
+  bool is_safe_spot = board->board_points[dest].checker_count < 2;
+  return is_safe_spot;
+}
+
+typedef struct {
+  int v1, v2;
+  bool used1, used2;
+  int doublet_times_used;
+} DiceRoll;
+
+int roll_dice() { return rand() % 6 + 1; }
+
+DiceRoll new_dice_roll() {
+  return (DiceRoll){roll_dice(), roll_dice(), false, false, 0};
+}
+
+bool can_use_roll_val(DiceRoll *dice_roll, int val) {
+  if (dice_roll->v1 == dice_roll->v2) {
+    return val == dice_roll->v1 && dice_roll->doublet_times_used < 4;
+  }
+  if (val == dice_roll->v1) {
+    return dice_roll->used1;
+  }
+  if (val == dice_roll->v2) {
+    return dice_roll->used2;
+  }
+  return false;
+}
+
+void use_roll_val(DiceRoll *dice_roll, int val) {
+  if (dice_roll->v1 == dice_roll->v2 && val == dice_roll->v1) {
+    dice_roll->doublet_times_used++;
+  }
+  if (val == dice_roll->v1) {
+    dice_roll->used1 = true;
+  }
+  if (val == dice_roll->v2) {
+    dice_roll->used2 = true;
+  }
+}
+
+bool dice_roll_used(DiceRoll *dice_roll) {
+  return (dice_roll->v1 == dice_roll->v2 &&
+          dice_roll->doublet_times_used >= 4) ||
+         (dice_roll->used1 && dice_roll->used2);
 }
 
 typedef struct {
@@ -177,8 +272,6 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
 }
 
 void print_board_ui(WinWrapper *win_wrapper) {
-  WINDOW *win = win_wrapper->win;
-
   mv_print_str(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
                "12  11  10  09  08  07 |   | 06  05  04  03  02  01");
   mv_print_str(win_wrapper, CONTENT_Y_START + BOARD_HEIGHT / 2, CONTENT_X_START,
@@ -201,8 +294,8 @@ void print_board_checkers(WinWrapper *win_wrapper, Board *board) {
 void print_board(Board *board, WinWrapper *win_wrapper) {
   print_board_ui(win_wrapper);
   print_board_checkers(win_wrapper, board);
-  print_checkers_on_bar(win_wrapper, &board->red_player_bar);
-  print_checkers_on_bar(win_wrapper, &board->white_player_bar);
+  print_checkers_on_bar(win_wrapper, &board->red_bar);
+  print_checkers_on_bar(win_wrapper, &board->white_bar);
 }
 
 void display_board(Board *board, WinWrapper *win_wrapper) {
@@ -233,8 +326,6 @@ void init_game(WinManager *win_manager, GameManager *game_manager) {
   clear_refresh_win(&win_manager->io_win);
   *game_manager = new_game_manager(white_name, red_name);
 }
-
-int roll_dice() { return rand() % 6 + 1; }
 
 void game_loop(WinManager *win_manager) {
   Board board = default_board();
