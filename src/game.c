@@ -24,6 +24,49 @@ CheckerKind opposite_checker(CheckerKind checker_kind) {
 }
 
 typedef struct {
+  int v1, v2;
+  bool used1, used2;
+  int doublet_times_used;
+} DiceRoll;
+
+int roll_dice() { return rand() % 6 + 1; }
+
+DiceRoll new_dice_roll() {
+  return (DiceRoll){roll_dice(), roll_dice(), false, false, 0};
+}
+
+bool can_use_roll_val(DiceRoll *dice_roll, int val) {
+  if (dice_roll->v1 == dice_roll->v2) {
+    return val == dice_roll->v1 && dice_roll->doublet_times_used < 4;
+  }
+  if (val == dice_roll->v1) {
+    return dice_roll->used1;
+  }
+  if (val == dice_roll->v2) {
+    return dice_roll->used2;
+  }
+  return false;
+}
+
+void use_roll_val(DiceRoll *dice_roll, int val) {
+  if (dice_roll->v1 == dice_roll->v2 && val == dice_roll->v1) {
+    dice_roll->doublet_times_used++;
+  }
+  if (val == dice_roll->v1) {
+    dice_roll->used1 = true;
+  }
+  if (val == dice_roll->v2) {
+    dice_roll->used2 = true;
+  }
+}
+
+bool dice_roll_used(DiceRoll *dice_roll) {
+  return (dice_roll->v1 == dice_roll->v2 &&
+          dice_roll->doublet_times_used >= 4) ||
+         (dice_roll->used1 && dice_roll->used2);
+}
+
+typedef struct {
   const char *name;
   CheckerKind checker_kind;
 } Player;
@@ -203,10 +246,17 @@ bool can_player_bear_off(Board *board, CheckerKind checker_kind) {
   return sum == CHECKER_COUNT;
 }
 
+bool can_player_move_to_point(Board *board, CheckerKind checker_kind, int pos) {
+
+  return board->board_points[pos].checker_kind == checker_kind ||
+         board->board_points[pos].checker_count <= 1;
+}
+
 // just check if moving checker is legal, doesnt check for checkers on bar,
 // and whether player has dice enough to play that move
 bool is_move_legal(Board *board, CheckerKind checker_kind, int from, int dest) {
-  if (checker_kind == None || board->board_points[from].checker_count == 0 ||
+  if (from == dest || checker_kind == None ||
+      board->board_points[from].checker_count == 0 ||
       board->board_points[from].checker_kind != checker_kind)
     return false;
 
@@ -216,12 +266,28 @@ bool is_move_legal(Board *board, CheckerKind checker_kind, int from, int dest) {
       return false;
     return can_player_bear_off(board, checker_kind);
   }
+  return can_player_move_to_point(board, checker_kind, dest);
+}
 
-  return board->board_points[dest].checker_kind == checker_kind ||
-         board->board_points[dest].checker_count <= 1;
+int enter_pos(CheckerKind checker_kind, int move_by) {
+  if (checker_kind == White) {
+    return RED_OUT_START - move_by;
+  } else if (checker_kind == Red) {
+    return WHITE_OUT_START + move_by;
+  }
+  return -1;
+}
+bool is_enter_legal(Board *board, CheckerKind checker_kind, int move_by) {
+  if (checker_kind == None || move_by > QUARTER_BOARD || move_by <= 0)
+    return false;
+
+  int pos = enter_pos(checker_kind, move_by);
+  return can_player_move_to_point(board, checker_kind, pos);
 }
 
 void decrement_point(Board *board, int pos) {
+  if (board->board_points[pos].checker_count == 0)
+    return;
   board->board_points[pos].checker_count--;
   if (board->board_points[pos].checker_count == 0) {
     board->board_points[pos].checker_kind = None;
@@ -273,47 +339,71 @@ bool player_move(Board *board, CheckerKind checker_kind, int from,
   return true;
 }
 
-typedef struct {
-  int v1, v2;
-  bool used1, used2;
-  int doublet_times_used;
-} DiceRoll;
+bool player_enter(Board *board, CheckerKind checker_kind, int move_by) {
+  if (!is_enter_legal(board, checker_kind, move_by))
+    return false;
 
-int roll_dice() { return rand() % 6 + 1; }
+  if (checker_kind == White) {
+    board->white_bar.checker_count--;
+  } else {
+    board->red_bar.checker_count--;
+  }
 
-DiceRoll new_dice_roll() {
-  return (DiceRoll){roll_dice(), roll_dice(), false, false, 0};
+  int pos = enter_pos(checker_kind, move_by);
+  increment_point(board, pos, checker_kind);
+
+  return true;
 }
 
-bool can_use_roll_val(DiceRoll *dice_roll, int val) {
+int legal_enters_count(Board *board, CheckerKind checker_kind,
+                       DiceRoll *dice_roll) {
+  if (checker_kind == None)
+    return 0;
+
+  int checker_count;
+  if (checker_kind == White)
+    checker_count = board->white_bar.checker_count;
+  else
+    checker_count = board->red_bar.checker_count;
+  if (checker_count == 0)
+    return 0;
+
+  int count = 0;
   if (dice_roll->v1 == dice_roll->v2) {
-    return val == dice_roll->v1 && dice_roll->doublet_times_used < 4;
+    if (is_enter_legal(board, checker_kind, dice_roll->v1))
+      count += 4;
+
+  } else {
+    if (is_enter_legal(board, checker_kind, dice_roll->v1))
+      count++;
+    if (is_enter_legal(board, checker_kind, dice_roll->v2))
+      count++;
   }
-  if (val == dice_roll->v1) {
-    return dice_roll->used1;
+  if (count > checker_count)
+    count = checker_count;
+  return count;
+}
+
+bool any_move_legal(Board *board, CheckerKind checker_kind,
+                    DiceRoll *dice_roll) {
+  if (checker_kind == None || dice_roll_used(dice_roll))
+    return false;
+
+  bool v1_used = dice_roll->used1;
+  bool v2_used = dice_roll->used2;
+  if (dice_roll->v1 == dice_roll->v2) {
+    v1_used = dice_roll->doublet_times_used >= 4;
+    v2_used = true;
   }
-  if (val == dice_roll->v2) {
-    return dice_roll->used2;
+  for (int i = 0; i < BOARD_SIZE; i++) {
+    if (board->board_points[i].checker_kind != checker_kind)
+      continue;
+    if (!v1_used && is_move_legal(board, checker_kind, i, dice_roll->v1))
+      return true;
+    if (!v2_used && is_move_legal(board, checker_kind, i, dice_roll->v2))
+      return true;
   }
   return false;
-}
-
-void use_roll_val(DiceRoll *dice_roll, int val) {
-  if (dice_roll->v1 == dice_roll->v2 && val == dice_roll->v1) {
-    dice_roll->doublet_times_used++;
-  }
-  if (val == dice_roll->v1) {
-    dice_roll->used1 = true;
-  }
-  if (val == dice_roll->v2) {
-    dice_roll->used2 = true;
-  }
-}
-
-bool dice_roll_used(DiceRoll *dice_roll) {
-  return (dice_roll->v1 == dice_roll->v2 &&
-          dice_roll->doublet_times_used >= 4) ||
-         (dice_roll->used1 && dice_roll->used2);
 }
 
 typedef struct {
