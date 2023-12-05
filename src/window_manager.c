@@ -6,29 +6,6 @@
 #include <ncurses.h>
 #include <time.h>
 
-const int VERTICAL_MARGIN = 2;
-const int IN_BETWEEN_LINES_MARGIN = 1;
-
-const int WIN_HORIZONTAL_MARGIN = 2;
-const int WIN_VERTICAL_MARGIN = 1;
-
-const int CONTENT_WIN_HEIGHT = BOARD_HEIGHT + 2;
-const int CONTENT_WIN_WIDTH = BOARD_WIDTH + 2;
-
-const int SIDE_WIN_HEIGHT = CONTENT_WIN_HEIGHT;
-const int SIDE_WIN_WIDTH = 16;
-
-const int ABOUT_WIN_HEIGHT = 3;
-const int ABOUT_WIN_WIDTH =
-    2 * WIN_HORIZONTAL_MARGIN + SIDE_WIN_WIDTH * 2 + CONTENT_WIN_WIDTH;
-
-const int IO_WIN_HEIGHT = CONTENT_WIN_HEIGHT / 2;
-const int IO_WIN_WIDTH = ABOUT_WIN_WIDTH;
-
-const int MIN_HEIGHT = ABOUT_WIN_HEIGHT + CONTENT_WIN_HEIGHT + IO_WIN_HEIGHT +
-                       4 * WIN_VERTICAL_MARGIN + 2;
-const int MIN_WIDTH = ABOUT_WIN_WIDTH + 2 * WIN_HORIZONTAL_MARGIN + 2;
-
 WinManager new_win_manager() {
   int term_height, term_width;
   getmaxyx(stdscr, term_height, term_width);

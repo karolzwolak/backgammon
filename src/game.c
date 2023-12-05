@@ -12,6 +12,13 @@
 
 #define CHECKER_COUNT 15
 
+#define STATS_LINES_COUNT 2
+#define STATS_GAP 3
+#define STATS_TOP_BOT_MARGIN                                                   \
+  (SIDE_WIN_HEIGHT - STATS_GAP - STATS_LINES_COUNT * 2)
+#define STATS_WHITE_Y_START 1 + STATS_TOP_BOT_MARGIN
+#define STATS_RED_Y_START SIDE_WIN_HEIGHT - 1 - STATS_TOP_BOT_MARGIN
+
 typedef enum { None, White, Red } CheckerKind;
 
 CheckerKind opposite_checker(CheckerKind checker_kind) {
@@ -494,6 +501,7 @@ void init_game(WinManager *win_manager, GameManager *game_manager) {
   clear_refresh_win(&win_manager->io_win);
   *game_manager = new_game_manager(white_name, red_name);
 }
+
 
 bool move_input(WinManager *win_manager, int *from, int *by) {
   bool quit =
