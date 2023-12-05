@@ -22,6 +22,12 @@
 #define STATS_RED_Y_START                                                      \
   SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
 
+#define WHITE_CHECKER_CHAR "W"
+#define RED_CHECKER_CHAR "R"
+
+#define checker_char(checker_kind)                                             \
+  checker_kind == White ? WHITE_CHECKER_CHAR : RED_CHECKER_CHAR
+
 typedef enum { None, White, Red } CheckerKind;
 
 CheckerKind opposite_checker(CheckerKind checker_kind) {
@@ -107,21 +113,13 @@ void print_overflowing_checkers(WinWrapper *win_wrapper,
                board_point->checker_count - BOARD_ROW_COUNT);
 }
 
-void checker_draw_char(char *out, CheckerKind checker_kind) {
-  if (checker_kind == Red)
-    sprintf(out, "R");
-  else if (checker_kind == White)
-    sprintf(out, "W");
-}
-
 void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
                        int id) {
 
   if (board_point->checker_count == 0 || board_point->checker_kind == None)
     return;
 
-  char out[2] = "";
-  checker_draw_char(out, board_point->checker_kind);
+  char *out = checker_char(board_point->checker_kind);
 
   bool on_bottom = id >= HALF_BOARD;
   int y, x, move_by;
@@ -161,8 +159,7 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
   if (board_point->checker_count == 0 || board_point->checker_kind == None)
     return;
 
-  char out[2] = "";
-  checker_draw_char(out, board_point->checker_kind);
+  char *out = checker_char(board_point->checker_kind);
 
   int start_y, move_dir;
   if (board_point->checker_kind == Red) {
