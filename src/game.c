@@ -4,6 +4,8 @@
 #include <ncurses.h>
 #include <stdlib.h>
 
+#define MAX_DOUBLET_USES 4
+
 #define WHITE_HOME_START 5
 #define RED_HOME_START BOARD_SIZE - 5
 
@@ -44,7 +46,8 @@ DiceRoll new_dice_roll() {
 
 bool can_use_roll_val(DiceRoll *dice_roll, int val) {
   if (dice_roll->v1 == dice_roll->v2) {
-    return val == dice_roll->v1 && dice_roll->doublet_times_used < 4;
+    return val == dice_roll->v1 &&
+           dice_roll->doublet_times_used < MAX_DOUBLET_USES;
   }
   if (val == dice_roll->v1) {
     return dice_roll->used1;
@@ -69,7 +72,7 @@ void use_roll_val(DiceRoll *dice_roll, int val) {
 
 bool dice_roll_used(DiceRoll *dice_roll) {
   return (dice_roll->v1 == dice_roll->v2 &&
-          dice_roll->doublet_times_used >= 4) ||
+          dice_roll->doublet_times_used >= MAX_DOUBLET_USES) ||
          (dice_roll->used1 && dice_roll->used2);
 }
 
@@ -220,7 +223,7 @@ Board default_board() {
   int default_board_positions[] = {0, 11, 16, 18};
   int default_board_checker_counts[] = {2, 5, 3, 5};
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < MAX_DOUBLET_USES; i++) {
     set_checkers(&board, default_board_positions[i], White,
                  default_board_checker_counts[i]);
     set_checkers(&board, BOARD_SIZE - default_board_positions[i] - 1, Red,
@@ -342,10 +345,12 @@ bool is_enter_legal(GameManager *game_manager, int move_by) {
   int pos = enter_pos(game_manager->curr_player, move_by);
   return can_player_move_to_point(game_manager, pos);
 }
+
 // returns whether move was legal
 bool player_move(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
   int dest = from;
+
   if (game_manager->curr_player == White) {
     dest -= move_by;
   } else if (game_manager->curr_player == Red) {
@@ -409,7 +414,7 @@ int legal_enters_count(GameManager *game_manager) {
   int v2 = game_manager->dice_roll.v2;
   if (v1 == v2) {
     if (is_enter_legal(game_manager, v1))
-      count += 4;
+      count += MAX_DOUBLET_USES;
   } else {
     if (is_enter_legal(game_manager, v1))
       count++;
@@ -432,7 +437,7 @@ bool any_move_legal(GameManager *game_manager) {
   bool v2_used = game_manager->dice_roll.used2;
 
   if (v1 == v2) {
-    v1_used = game_manager->dice_roll.doublet_times_used >= 4;
+    v1_used = game_manager->dice_roll.doublet_times_used >= MAX_DOUBLET_USES;
     v2_used = true;
   }
   for (int i = 0; i < BOARD_SIZE; i++) {
@@ -496,10 +501,23 @@ void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
   int v1 = game_manager->dice_roll.v1;
   int v2 = game_manager->dice_roll.v2;
 
+  mv_printf_centered(win_wrapper, y, "roll: ");
   if (v1 == v2) {
-    mv_printf_centered(win_wrapper, y, "roll: %d %d %d %d", v1, v1, v1, v1);
+    for (int i = game_manager->dice_roll.doublet_times_used;
+         i < MAX_DOUBLET_USES; i++)
+      win_printf(win_wrapper, " %d", v1);
+    for (int i = 0; i < game_manager->dice_roll.doublet_times_used; i++)
+      win_printf(win_wrapper, " _");
   } else {
-    mv_printf_centered(win_wrapper, y, "roll: %d %d", v1, v2);
+    if (game_manager->dice_roll.used1) {
+      win_printf(win_wrapper, " %d _", v2);
+      return;
+    }
+    win_printf(win_wrapper, " %d", v1);
+    if (!game_manager->dice_roll.used2)
+      win_printf(win_wrapper, " %d", v2);
+    else
+      win_printf(win_wrapper, " _");
   }
 }
 
