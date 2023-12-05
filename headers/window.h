@@ -2,6 +2,7 @@
 #include <ncurses.h>
 
 #define MAX_INPUT_LEN 20
+#define MAX_OUTPUT_LEN 100
 #define _STR(x) #x
 #define STR(X) _STR(X)
 
@@ -22,10 +23,10 @@ void clear_win(WinWrapper *win_wrapper);
 void refresh_win(WinWrapper *win_wrapper);
 void move_rel(WinWrapper *win_wrapper, int dy, int dx);
 
-void print(WinWrapper *win_wrapper, const char *str);
-void mv_print_str(WinWrapper *win_wrapper, int y, int x, const char *str);
-void mv_print_centered(WinWrapper *win_wrapper, int y, const char *str);
-void print_centered_on_new_line(WinWrapper *win_wrapper, const char *str);
+void win_printf(WinWrapper *win_wrapper, const char *fmt, ...);
+void mv_printf_yx(WinWrapper *win_wrapper, int y, int x, const char *fmt, ...);
+void mv_printf_centered(WinWrapper *win_wrapper, int y, const char *fmt, ...);
+void printf_centered_on_new_line(WinWrapper *win_wrapper, const char *fmt, ...);
 
 void clear_line(WinWrapper *win_wrapper, int y_to_clear);
 void clear_curr_line(WinWrapper *win_wrapper);

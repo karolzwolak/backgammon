@@ -2,7 +2,6 @@
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
 #include <ncurses.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #define WHITE_HOME_START 5
@@ -92,11 +91,8 @@ BoardPoint new_board_point(CheckerKind checker_kind, int checker_count) {
 
 void print_overflowing_checkers(WinWrapper *win_wrapper,
                                 BoardPoint *board_point, int y, int x) {
-
-  char out[3] = "";
-
-  sprintf(out, "%02d", board_point->checker_count - BOARD_ROW_COUNT);
-  mv_print_str(win_wrapper, y, x, out);
+  mv_printf_yx(win_wrapper, y, x, "%02d",
+               board_point->checker_count - BOARD_ROW_COUNT);
 }
 
 void checker_draw_char(char *out, CheckerKind checker_kind) {
@@ -139,7 +135,7 @@ void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
   if (draw_count > BOARD_ROW_COUNT)
     draw_count = BOARD_ROW_COUNT - 1;
   for (int i = 0; i < draw_count; i++) {
-    mv_print_str(win_wrapper, y, x, out);
+    mv_printf_yx(win_wrapper, y, x, out);
     y += move_by;
   }
 
@@ -170,7 +166,7 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
     int col = i % 3;
     int row = i / 3;
 
-    mv_print_str(win_wrapper, start_y + row * move_dir, BOARD_WIDTH / 2 + col,
+    mv_printf_yx(win_wrapper, start_y + row * move_dir, BOARD_WIDTH / 2 + col,
                  out);
   }
 }
@@ -444,16 +440,16 @@ bool any_move_legal(GameManager *game_manager) {
 }
 
 void print_board_ui(WinWrapper *win_wrapper) {
-  mv_print_str(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
+  mv_printf_yx(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
                "12  11  10  09  08  07 |   | 06  05  04  03  02  01");
-  mv_print_str(win_wrapper, CONTENT_Y_START + BOARD_HEIGHT / 2, CONTENT_X_START,
+  mv_printf_yx(win_wrapper, CONTENT_Y_START + BOARD_HEIGHT / 2, CONTENT_X_START,
                "---------------------- |BAR| ----------------------");
-  mv_print_str(win_wrapper, CONTENT_Y_END, CONTENT_X_START,
+  mv_printf_yx(win_wrapper, CONTENT_Y_END, CONTENT_X_START,
                "13  14  15  16  17  18 |   | 19  20  21  22  23  24");
 
   for (int i = 0; i < BOARD_ROW_COUNT; i++) {
-    mv_print_centered(win_wrapper, CONTENT_Y_START + i + 1, "|   |");
-    mv_print_centered(win_wrapper, CONTENT_Y_END - i - 1, "|   |");
+    mv_printf_centered(win_wrapper, CONTENT_Y_START + i + 1, "|   |");
+    mv_printf_centered(win_wrapper, CONTENT_Y_END - i - 1, "|   |");
   }
 }
 
@@ -477,7 +473,7 @@ void display_board(Board *board, WinWrapper *win_wrapper) {
 }
 
 int input_int(WinWrapper *io_wrapper, const char *prompt) {
-  print_centered_on_new_line(io_wrapper, prompt);
+  printf_centered_on_new_line(io_wrapper, "%s", prompt);
   int res = -1;
   wscanw(io_wrapper->win, "%d", &res);
   move_rel(io_wrapper, -1, 0);

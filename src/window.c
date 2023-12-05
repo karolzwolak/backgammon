@@ -36,27 +36,44 @@ void move_rel(WinWrapper *win_wrapper, int dy, int dx) {
 
 void refresh_win(WinWrapper *win_wrapper) { wrefresh(win_wrapper->win); }
 
-void print(WinWrapper *win_wrapper, const char *str) {
-  waddstr(win_wrapper->win, str);
+void win_printf(WinWrapper *win_wrapper, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vw_printw(win_wrapper->win, fmt, args);
+  va_end(args);
 }
 
-void mv_print_str(WinWrapper *win_wrapper, int y, int x, const char *str) {
+void mv_printf_yx(WinWrapper *win_wrapper, int y, int x, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
   wmove(win_wrapper->win, y, x);
-  print(win_wrapper, str);
+  vw_printw(win_wrapper->win, fmt, args);
+  va_end(args);
 }
 
-void mv_print_centered(WinWrapper *win_wrapper, int y, const char *str) {
-  int length = strlen(str);
-  int margin = (win_wrapper->width - length - 2) / 2;
-  mv_print_str(win_wrapper, y, margin + 1, str);
+void mv_printf_centered_var(WinWrapper *win_wrapper, int y, const char *fmt,
+                            va_list args) {
+  char buf[MAX_OUTPUT_LEN];
+  int length = vsprintf(buf, fmt, args);
+
+  int margin = (win_wrapper->width - length - 1) / 2;
+  mvwaddstr(win_wrapper->win, y, margin + 1, buf);
 }
 
-void print_centered_on_new_line(WinWrapper *win_wrapper, const char *str) {
-  int x, y;
-  getyx(win_wrapper->win, y, x);
-  if (x == 0)
-    y++;
-  mv_print_centered(win_wrapper, y, str);
+void mv_printf_centered(WinWrapper *win_wrapper, int y, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  mv_printf_centered_var(win_wrapper, y, fmt, args);
+  va_end(args);
+}
+
+void printf_centered_on_new_line(WinWrapper *win_wrapper, const char *fmt,
+                                 ...) {
+  va_list args;
+  va_start(args, fmt);
+  int y = getcury(win_wrapper->win) + 1;
+  mv_printf_centered_var(win_wrapper, y, fmt, args);
+  va_end(args);
 }
 
 void clear_line(WinWrapper *win_wrapper, int y_to_clear) {
@@ -98,7 +115,7 @@ bool check_for_quit_input(char *input) {
 }
 
 void prompt_input(WinWrapper *io_wrapper, const char *prompt, char *res) {
-  print_centered_on_new_line(io_wrapper, prompt);
+  printf_centered_on_new_line(io_wrapper, prompt);
   wscanw(io_wrapper->win, "%" STR(MAX_INPUT_LEN) "s", res);
   move_rel(io_wrapper, -1, 0);
 }

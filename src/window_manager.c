@@ -81,7 +81,7 @@ void add_main_border(WinWrapper *main_win) {
 }
 
 void print_line(WinWrapper *win_wrapper, int *line, const char *str) {
-  mv_print_centered(win_wrapper, *line, str);
+  mv_printf_centered(win_wrapper, *line, str);
   *line += IN_BETWEEN_LINES_MARGIN + 1;
 }
 
@@ -135,7 +135,7 @@ void menu_loop(WinManager *win_manager) {
 
 void show_about_info(WinWrapper *win_wrapper) {
   clear_win(win_wrapper);
-  mv_print_centered(
+  mv_printf_centered(
       win_wrapper, 1,
       "backgammon game in terminal, made by: Karol Zwolak, id: 197883");
   refresh_win(win_wrapper);
