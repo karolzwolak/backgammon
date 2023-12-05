@@ -61,6 +61,7 @@ bool can_use_roll_val(DiceRoll *dice_roll, int val) {
 void use_roll_val(DiceRoll *dice_roll, int val) {
   if (dice_roll->v1 == dice_roll->v2 && val == dice_roll->v1) {
     dice_roll->doublet_times_used++;
+    return;
   }
   if (val == dice_roll->v1) {
     dice_roll->used1 = true;
@@ -315,16 +316,28 @@ bool can_player_bear_off(GameManager *game_manager) {
   return sum == CHECKER_COUNT;
 }
 
-bool can_player_move_to_point(GameManager *game_manager, int pos) {
-  return game_manager->board.board_points[pos].checker_kind ==
+bool can_player_move_to_point(GameManager *game_manager, int dest) {
+  return game_manager->board.board_points[dest].checker_kind ==
              game_manager->curr_player ||
-         game_manager->board.board_points[pos].checker_count <= 1;
+         game_manager->board.board_points[dest].checker_count <= 1;
+}
+
+int move_dest(GameManager *game_manager, int from, int move_by) {
+  int dest = from;
+
+  if (game_manager->curr_player == White) {
+    dest -= move_by;
+  } else if (game_manager->curr_player == Red) {
+    dest += move_by;
+  }
+  return dest;
 }
 
 // just check if moving checker is legal, doesnt check for checkers on bar,
 // and whether player has dice enough to play that move
-bool is_move_legal(GameManager *game_manager, int from, int dest) {
+bool is_move_legal(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
+  int dest = move_dest(game_manager, from, move_by);
   if (from == dest || game_manager->curr_player == None ||
       board->board_points[from].checker_count == 0 ||
       board->board_points[from].checker_kind != game_manager->curr_player)
@@ -339,7 +352,7 @@ bool is_move_legal(GameManager *game_manager, int from, int dest) {
   return can_player_move_to_point(game_manager, dest);
 }
 
-int enter_pos(CheckerKind checker_kind, int move_by) {
+int enter_dest(CheckerKind checker_kind, int move_by) {
   if (checker_kind == White) {
     return RED_OUT_START - move_by;
   } else if (checker_kind == Red) {
@@ -353,22 +366,16 @@ bool is_enter_legal(GameManager *game_manager, int move_by) {
       move_by <= 0)
     return false;
 
-  int pos = enter_pos(game_manager->curr_player, move_by);
+  int pos = enter_dest(game_manager->curr_player, move_by);
   return can_player_move_to_point(game_manager, pos);
 }
 
 // returns whether move was legal
 bool player_move(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
-  int dest = from;
+  int dest = move_dest(game_manager, from, move_by);
 
-  if (game_manager->curr_player == White) {
-    dest -= move_by;
-  } else if (game_manager->curr_player == Red) {
-    dest += move_by;
-  }
-
-  if (!is_move_legal(game_manager, from, dest))
+  if (!is_move_legal(game_manager, from, move_by))
     return false;
 
   decrement_point(board, from);
@@ -402,8 +409,8 @@ bool player_enter(GameManager *game_manager, int move_by) {
     board->red_bar.checker_count--;
   }
 
-  int pos = enter_pos(game_manager->curr_player, move_by);
-  increment_point(board, pos, game_manager->curr_player);
+  int dest = enter_dest(game_manager->curr_player, move_by);
+  increment_point(board, dest, game_manager->curr_player);
 
   return true;
 }
@@ -645,6 +652,14 @@ bool play_turn(WinManager *win_manager, GameManager *game_manager) {
   return false;
 }
 
+CheckerKind check_game_over(GameManager *game_manager) {
+  if (game_manager->board.white_out_count >= CHECKER_COUNT)
+    return White;
+  if (game_manager->board.red_out_count >= CHECKER_COUNT)
+    return Red;
+  return None;
+}
+
 void game_loop(WinManager *win_manager) {
   disable_cursor();
 
@@ -656,24 +671,23 @@ void game_loop(WinManager *win_manager) {
   while (true) {
     display_game(win_manager, &game_manager);
     if (play_turn(win_manager, &game_manager)) {
-      clear_refresh_win(&win_manager->io_win);
-      clear_refresh_win(&win_manager->stats_win);
-      disable_cursor();
-      return;
+      break;
     }
-    // switch (win_char_input(&win_manager->io_win)) {
-    // case 'i':
-    //   game_manager.curr_player =
-    //       game_manager.curr_player == White ? Red : White;
-    //   break;
-    // case 'q':
-    //   return;
-    //
-    // default:
-    //   enable_cursor();
-    //   make_move_loop(win_manager, &game_manager);
-    //   disable_cursor();
-    //   break;
-    // }
+    CheckerKind won = check_game_over(&game_manager);
+    if (won != None) {
+      clear_refresh_win(&win_manager->content_win);
+      mv_printf_centered(&win_manager->content_win, CONTENT_Y_END / 2,
+                         "Game Over!");
+
+      if (won == White)
+        printf_centered_on_new_line(&win_manager->content_win, "White Wins!");
+      else
+        printf_centered_on_new_line(&win_manager->content_win, "Red Wins!");
+      win_char_input(&win_manager->io_win);
+      break;
+    }
   }
+  clear_refresh_win(&win_manager->io_win);
+  clear_refresh_win(&win_manager->stats_win);
+  disable_cursor();
 }
