@@ -282,6 +282,15 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   return game_manager;
 }
 
+void swap_players(GameManager *game_manager) {
+  game_manager->dice_roll = new_dice_roll();
+  if (game_manager->curr_player == White) {
+    game_manager->curr_player = Red;
+  } else {
+    game_manager->curr_player = White;
+  }
+}
+
 bool can_player_bear_off(GameManager *game_manager) {
   int sum = 0;
   Board *board = &game_manager->board;
@@ -565,21 +574,71 @@ bool move_input(WinManager *win_manager, int *from, int *by) {
   return quit;
 }
 
-bool make_move(WinManager *win_manager, GameManager *game_manager) {
-  int by = -1, from = -1;
-  bool quit = move_input(win_manager, &from, &by);
-  if (quit)
-    return true;
+bool make_move_loop(WinManager *win_manager, GameManager *game_manager) {
+  bool legal = false;
+  int by, from;
+  while (!legal) {
+    by = -1;
+    from = -1;
+    bool quit = move_input(win_manager, &from, &by);
+    if (quit)
+      return true;
 
-  // TODO: make the actual move
-  bool legal = player_move(game_manager, from, by);
-  if (legal)
-    wprintw(win_manager->io_win.win, " made move %d by %d", from, by);
-  else
-    wprintw(win_manager->io_win.win, " illegal move %d by %d", from, by);
+    bool can_use = can_use_roll_val(&game_manager->dice_roll, by);
+    bool was_moved = player_move(game_manager, from, by);
+    legal = can_use && was_moved;
+    // legal = can_use_roll_val(&game_manager->dice_roll, by) &&
+    //         player_move(game_manager, from, by);
 
-  win_char_input(&win_manager->io_win);
+    clear_refresh_win(&win_manager->io_win);
+    win_printf(&win_manager->io_win, "cant from %d by %d %d %d", from, by,
+               can_use, was_moved);
+  }
+  use_roll_val(&game_manager->dice_roll, by);
+
+  return false;
+}
+
+bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
+  bool legal = false;
+  int val;
+  while (!legal) {
+    val = -1;
+    bool quit = int_prompt_input_untill(&win_manager->io_win,
+                                        "Enter using value: ", &val);
+    if (quit)
+      return true;
+
+    legal = can_use_roll_val(&game_manager->dice_roll, val) &&
+            player_enter(game_manager, val);
+
+    clear_refresh_win(&win_manager->io_win);
+  }
+  use_roll_val(&game_manager->dice_roll, val);
+
+  return false;
+}
+
+bool play_turn(WinManager *win_manager, GameManager *game_manager) {
+  int enter_moves_count = legal_enters_count(game_manager);
+  for (int i = 0; i < enter_moves_count; i++) {
+    if (make_enter_move_loop(win_manager, game_manager))
+      return true;
+    display_game(win_manager, game_manager);
+  }
+
+  while (!dice_roll_used(&game_manager->dice_roll) &&
+         any_move_legal(game_manager)) {
+
+    if (make_move_loop(win_manager, game_manager))
+      return true;
+
+    win_printf(&win_manager->io_win, "moved");
+    display_game(win_manager, game_manager);
+  }
+
   clear_refresh_win(&win_manager->io_win);
+  swap_players(game_manager);
 
   return false;
 }
@@ -591,21 +650,27 @@ void game_loop(WinManager *win_manager) {
 
   GameManager game_manager = new_game_manager("white", "red");
 
+  enable_cursor();
   while (true) {
     display_game(win_manager, &game_manager);
-    switch (win_char_input(&win_manager->io_win)) {
-    case 'i':
-      game_manager.curr_player =
-          game_manager.curr_player == White ? Red : White;
-      break;
-    case 'q':
-      return;
-
-    default:
-      enable_cursor();
-      make_move(win_manager, &game_manager);
+    if (play_turn(win_manager, &game_manager)) {
+      clear_refresh_win(&win_manager->io_win);
       disable_cursor();
-      break;
+      return;
     }
+    // switch (win_char_input(&win_manager->io_win)) {
+    // case 'i':
+    //   game_manager.curr_player =
+    //       game_manager.curr_player == White ? Red : White;
+    //   break;
+    // case 'q':
+    //   return;
+    //
+    // default:
+    //   enable_cursor();
+    //   make_move_loop(win_manager, &game_manager);
+    //   disable_cursor();
+    //   break;
+    // }
   }
 }
