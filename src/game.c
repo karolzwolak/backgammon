@@ -222,8 +222,10 @@ Board default_board() {
   Board board = empty_board();
   int default_board_positions[] = {0, 11, 16, 18};
   int default_board_checker_counts[] = {2, 5, 3, 5};
+  int len =
+      sizeof(default_board_positions) / sizeof(default_board_positions[0]);
 
-  for (int i = 0; i < MAX_DOUBLET_USES; i++) {
+  for (int i = 0; i < len; i++) {
     set_checkers(&board, default_board_positions[i], White,
                  default_board_checker_counts[i]);
     set_checkers(&board, BOARD_SIZE - default_board_positions[i] - 1, Red,
