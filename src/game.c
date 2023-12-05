@@ -471,7 +471,7 @@ void print_board_ui(WinWrapper *win_wrapper) {
   mv_printf_yx(win_wrapper, CONTENT_Y_START, CONTENT_X_START,
                "12  11  10  09  08  07 |   | 06  05  04  03  02  01");
   mv_printf_yx(win_wrapper, CONTENT_Y_START + BOARD_HEIGHT / 2, CONTENT_X_START,
-               "---------------------- |BAR| ----------------------");
+               "---------------------- |BAR| ----------------- HOME");
   mv_printf_yx(win_wrapper, CONTENT_Y_END, CONTENT_X_START,
                "13  14  15  16  17  18 |   | 19  20  21  22  23  24");
 
