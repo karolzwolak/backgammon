@@ -12,12 +12,13 @@
 
 #define CHECKER_COUNT 15
 
-#define STATS_LINES_COUNT 2
+#define STATS_LINES_COUNT 3
 #define STATS_GAP 3
 #define STATS_TOP_BOT_MARGIN                                                   \
-  (SIDE_WIN_HEIGHT - STATS_GAP - STATS_LINES_COUNT * 2)
-#define STATS_WHITE_Y_START 1 + STATS_TOP_BOT_MARGIN
-#define STATS_RED_Y_START SIDE_WIN_HEIGHT - 1 - STATS_TOP_BOT_MARGIN
+  (SIDE_WIN_HEIGHT - STATS_GAP - 2 * STATS_LINES_COUNT) / 2
+#define STATS_WHITE_Y_START STATS_TOP_BOT_MARGIN
+#define STATS_RED_Y_START                                                      \
+  SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
 
 typedef enum { None, White, Red } CheckerKind;
 
@@ -473,10 +474,44 @@ void print_board(Board *board, WinWrapper *win_wrapper) {
   print_checkers_on_bar(win_wrapper, &board->white_bar);
 }
 
-void display_board(Board *board, WinWrapper *win_wrapper) {
+void display_board(WinWrapper *win_wrapper, Board *board) {
   clear_win(win_wrapper);
   print_board(board, win_wrapper);
   refresh_win(win_wrapper);
+}
+
+void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
+  mv_printf_centered(win_wrapper, STATS_WHITE_Y_START, "White");
+  printf_centered_on_new_line(win_wrapper, "out: %02d",
+                              game_manager->board.white_out_count);
+
+  mv_printf_centered(win_wrapper, STATS_RED_Y_START, "Red");
+  printf_centered_on_new_line(win_wrapper, "out: %02d",
+                              game_manager->board.red_out_count);
+  int y = 2;
+  if (game_manager->curr_player == White)
+    y += STATS_WHITE_Y_START;
+  else
+    y += STATS_RED_Y_START;
+  int v1 = game_manager->dice_roll.v1;
+  int v2 = game_manager->dice_roll.v2;
+
+  if (v1 == v2) {
+    mv_printf_centered(win_wrapper, y, "roll: %d %d %d %d", v1, v1, v1, v1);
+  } else {
+    mv_printf_centered(win_wrapper, y, "roll: %d %d", v1, v2);
+  }
+}
+
+void display_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
+  clear_win(win_wrapper);
+  print_stats(win_wrapper, game_manager);
+  refresh_win(win_wrapper);
+}
+
+void display_game(WinManager *win_manager, GameManager *game_manager) {
+  display_board(&win_manager->content_win, &game_manager->board);
+  display_stats(&win_manager->stats_win, game_manager);
 }
 
 int input_int(WinWrapper *io_wrapper, const char *prompt) {
@@ -501,7 +536,6 @@ void init_game(WinManager *win_manager, GameManager *game_manager) {
   clear_refresh_win(&win_manager->io_win);
   *game_manager = new_game_manager(white_name, red_name);
 }
-
 
 bool move_input(WinManager *win_manager, int *from, int *by) {
   bool quit =
@@ -538,11 +572,9 @@ void game_loop(WinManager *win_manager) {
   clear_refresh_win(&win_manager->io_win);
 
   GameManager game_manager = new_game_manager("white", "red");
-  game_manager.curr_player = White;
-  int field = 11;
 
   while (true) {
-    display_board(&game_manager.board, &win_manager->content_win);
+    display_game(win_manager, &game_manager);
     switch (win_char_input(&win_manager->io_win)) {
     case 'i':
       game_manager.curr_player =
