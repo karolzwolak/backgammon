@@ -108,8 +108,19 @@ bool int_prompt_input(WinWrapper *io_wrapper, const char *prompt, int *res) {
   prompt_input(io_wrapper, prompt, input);
   if (check_for_quit_input(input)) {
     *res = -1;
-    return false;
+    return true;
   }
   sscanf(input, "%d", res);
-  return true;
+  return false;
+}
+
+bool int_prompt_input_untill(WinWrapper *io_wrapper, const char *prompt,
+                             int *res) {
+  *res = -1;
+  bool quit = int_prompt_input(io_wrapper, prompt, res);
+  while (*res <= -1 && !quit) {
+    clear_curr_line(io_wrapper);
+    quit = int_prompt_input(io_wrapper, prompt, res);
+  }
+  return quit;
 }

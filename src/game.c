@@ -7,9 +7,21 @@
 
 #define WHITE_HOME_START 5
 #define RED_HOME_START BOARD_SIZE - 5
+
+#define WHITE_OUT_START -1
+#define RED_OUT_START BOARD_SIZE
+
 #define CHECKER_COUNT 15
 
 typedef enum { None, White, Red } CheckerKind;
+
+CheckerKind opposite_checker(CheckerKind checker_kind) {
+  if (checker_kind == None)
+    return None;
+  if (checker_kind == White)
+    return Red;
+  return White;
+}
 
 typedef struct {
   const char *name;
@@ -125,8 +137,8 @@ typedef struct {
   BoardPoint white_bar;
   BoardPoint red_bar;
 
-  int white_removed;
-  int red_removed;
+  int white_out_count;
+  int red_out_count;
 } Board;
 
 Board empty_board() {
@@ -173,15 +185,15 @@ Board default_board() {
 bool can_player_bear_off(Board *board, CheckerKind checker_kind) {
   int sum = 0;
   if (checker_kind == White) {
-    sum += board->white_removed;
-    for (int i = WHITE_HOME_START; i >= 0; i--) {
+    sum += board->white_out_count;
+    for (int i = WHITE_HOME_START; i > WHITE_OUT_START; i--) {
       if (board->board_points[i].checker_kind != checker_kind)
         continue;
       sum += board->board_points[i].checker_count;
     }
   } else {
-    sum += board->red_removed;
-    for (int i = RED_HOME_START; i < BOARD_SIZE; i++) {
+    sum += board->red_out_count;
+    for (int i = RED_HOME_START; i < RED_OUT_START; i++) {
       if (board->board_points[i].checker_kind != checker_kind)
         continue;
       sum += board->board_points[i].checker_count;
@@ -191,27 +203,74 @@ bool can_player_bear_off(Board *board, CheckerKind checker_kind) {
   return sum == CHECKER_COUNT;
 }
 
-bool is_move_legal(Board *board, CheckerKind checker_kind, int from,
-                   int move_by) {
-  if (checker_kind == None ||
+// just check if moving checker is legal, doesnt check for checkers on bar,
+// and whether player has dice enough to play that move
+bool is_move_legal(Board *board, CheckerKind checker_kind, int from, int dest) {
+  if (checker_kind == None || board->board_points[from].checker_count == 0 ||
       board->board_points[from].checker_kind != checker_kind)
     return false;
 
+  if (dest <= WHITE_OUT_START || dest >= RED_OUT_START) {
+    if ((dest <= WHITE_OUT_START && checker_kind != White) ||
+        (dest >= RED_OUT_START && checker_kind != Red))
+      return false;
+    return can_player_bear_off(board, checker_kind);
+  }
+
+  return board->board_points[dest].checker_kind == checker_kind ||
+         board->board_points[dest].checker_count <= 1;
+}
+
+void decrement_point(Board *board, int pos) {
+  board->board_points[pos].checker_count--;
+  if (board->board_points[pos].checker_count == 0) {
+    board->board_points[pos].checker_kind = None;
+  }
+}
+
+void increment_point(Board *board, int pos, CheckerKind checker_kind) {
+  board->board_points[pos].checker_count++;
+  board->board_points[pos].checker_kind = checker_kind;
+}
+
+void add_to_bar(Board *board, CheckerKind checker_kind) {
+  if (checker_kind == Red)
+    board->red_bar.checker_count++;
+  else if (checker_kind == White)
+    board->white_bar.checker_count++;
+}
+
+// returns whether move was legal
+bool player_move(Board *board, CheckerKind checker_kind, int from,
+                 int move_by) {
   int dest = from;
   if (checker_kind == White) {
     dest -= move_by;
-  } else {
+  } else if (checker_kind == Red) {
     dest += move_by;
   }
-  if (dest < 0 || dest >= BOARD_SIZE)
-    return can_player_bear_off(board, checker_kind);
 
-  if (board->board_points[dest].checker_kind == checker_kind ||
-      board->board_points[dest].checker_count == 0)
+  if (!is_move_legal(board, checker_kind, from, dest))
+    return false;
+
+  decrement_point(board, from);
+
+  if (dest <= WHITE_OUT_START || dest >= RED_OUT_START) {
+    if (checker_kind == White)
+      board->white_out_count++;
+    else
+      board->red_out_count++;
     return true;
+  }
 
-  bool is_safe_spot = board->board_points[dest].checker_count < 2;
-  return is_safe_spot;
+  if (board->board_points[dest].checker_kind != checker_kind &&
+      board->board_points[dest].checker_count > 0) {
+    add_to_bar(board, board->board_points[dest].checker_kind);
+    decrement_point(board, dest);
+  }
+  increment_point(board, dest, checker_kind);
+
+  return true;
 }
 
 typedef struct {
@@ -262,12 +321,14 @@ typedef struct {
 
   Player white_player;
   Player red_player;
+  CheckerKind curr_player;
+
 } GameManager;
 
 GameManager new_game_manager(const char *white_name, const char *red_name) {
   Player white = {white_name, White};
   Player red = {red_name, Red};
-  GameManager game_manager = {default_board(), white, red};
+  GameManager game_manager = {default_board(), white, red, None};
   return game_manager;
 }
 
@@ -327,20 +388,60 @@ void init_game(WinManager *win_manager, GameManager *game_manager) {
   *game_manager = new_game_manager(white_name, red_name);
 }
 
-void game_loop(WinManager *win_manager) {
-  Board board = default_board();
+bool move_input(WinManager *win_manager, int *from, int *by) {
+  bool quit =
+      int_prompt_input_untill(&win_manager->io_win, "Move from: ", from);
+  if (quit)
+    return true;
+  (*from)--;
+  quit = int_prompt_input_untill(&win_manager->io_win, "Move by: ", by);
+  return quit;
+}
 
+bool make_move(WinManager *win_manager, GameManager *game_manager) {
+  int by = -1, from = -1;
+  bool quit = move_input(win_manager, &from, &by);
+  if (quit)
+    return true;
+
+  // TODO: make the actual move
+  bool legal =
+      player_move(&game_manager->board, game_manager->curr_player, from, by);
+  if (legal)
+    wprintw(win_manager->io_win.win, " made move %d by %d", from, by);
+  else
+    wprintw(win_manager->io_win.win, " illegal move %d by %d", from, by);
+
+  win_char_input(&win_manager->io_win);
+  clear_refresh_win(&win_manager->io_win);
+
+  return false;
+}
+
+void game_loop(WinManager *win_manager) {
   disable_cursor();
 
   clear_refresh_win(&win_manager->io_win);
 
+  GameManager game_manager = new_game_manager("white", "red");
+  game_manager.curr_player = White;
+  int field = 11;
+
   while (true) {
-    display_board(&board, &win_manager->content_win);
+    display_board(&game_manager.board, &win_manager->content_win);
     switch (win_char_input(&win_manager->io_win)) {
     case 'i':
+      game_manager.curr_player =
+          game_manager.curr_player == White ? Red : White;
       break;
     case 'q':
       return;
+
+    default:
+      enable_cursor();
+      make_move(win_manager, &game_manager);
+      disable_cursor();
+      break;
     }
   }
 }

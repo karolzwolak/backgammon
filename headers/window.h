@@ -39,5 +39,7 @@ void str_to_lower(char *str);
 bool check_for_quit_input(char *input);
 
 void prompt_input(WinWrapper *io_wrapper, const char *prompt, char *res);
-// false means user wants to quit
+// true means user wants to quit
+bool int_prompt_input_untill(WinWrapper *io_wrapper, const char *prompt,
+                             int *res);
 bool int_prompt_input(WinWrapper *io_wrapper, const char *prompt, int *res);
