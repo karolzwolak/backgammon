@@ -495,11 +495,11 @@ void display_board(WinWrapper *win_wrapper, Board *board) {
 }
 
 void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
-  mv_printf_centered(win_wrapper, STATS_WHITE_Y_START, "White");
+  mv_printf_centered(win_wrapper, STATS_WHITE_Y_START, "-> White");
   printf_centered_on_new_line(win_wrapper, "out: %02d",
                               game_manager->board.white_out_count);
 
-  mv_printf_centered(win_wrapper, STATS_RED_Y_START, "Red");
+  mv_printf_centered(win_wrapper, STATS_RED_Y_START, "-> Red");
   printf_centered_on_new_line(win_wrapper, "out: %02d",
                               game_manager->board.red_out_count);
   int y = 2;
@@ -510,7 +510,13 @@ void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
   int v1 = game_manager->dice_roll.v1;
   int v2 = game_manager->dice_roll.v2;
 
-  mv_printf_centered(win_wrapper, y, "roll: ");
+  int x = 4;
+
+  if (game_manager->dice_roll.v1 == game_manager->dice_roll.v2) {
+    x = 1;
+  }
+
+  mv_printf_yx(win_wrapper, y, x, " roll", v1);
   if (v1 == v2) {
     for (int i = game_manager->dice_roll.doublet_times_used;
          i < MAX_DOUBLET_USES; i++)
@@ -584,15 +590,10 @@ bool make_move_loop(WinManager *win_manager, GameManager *game_manager) {
     if (quit)
       return true;
 
-    bool can_use = can_use_roll_val(&game_manager->dice_roll, by);
-    bool was_moved = player_move(game_manager, from, by);
-    legal = can_use && was_moved;
-    // legal = can_use_roll_val(&game_manager->dice_roll, by) &&
-    //         player_move(game_manager, from, by);
+    legal = can_use_roll_val(&game_manager->dice_roll, by) &&
+            player_move(game_manager, from, by);
 
     clear_refresh_win(&win_manager->io_win);
-    win_printf(&win_manager->io_win, "cant from %d by %d %d %d", from, by,
-               can_use, was_moved);
   }
   use_roll_val(&game_manager->dice_roll, by);
 
@@ -633,7 +634,6 @@ bool play_turn(WinManager *win_manager, GameManager *game_manager) {
     if (make_move_loop(win_manager, game_manager))
       return true;
 
-    win_printf(&win_manager->io_win, "moved");
     display_game(win_manager, game_manager);
   }
 
@@ -655,6 +655,7 @@ void game_loop(WinManager *win_manager) {
     display_game(win_manager, &game_manager);
     if (play_turn(win_manager, &game_manager)) {
       clear_refresh_win(&win_manager->io_win);
+      clear_refresh_win(&win_manager->stats_win);
       disable_cursor();
       return;
     }
