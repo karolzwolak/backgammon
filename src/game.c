@@ -50,10 +50,10 @@ bool can_use_roll_val(DiceRoll *dice_roll, int val) {
            dice_roll->doublet_times_used < MAX_DOUBLET_USES;
   }
   if (val == dice_roll->v1) {
-    return dice_roll->used1;
+    return !dice_roll->used1;
   }
   if (val == dice_roll->v2) {
-    return dice_roll->used2;
+    return !dice_roll->used2;
   }
   return false;
 }
