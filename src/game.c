@@ -2,6 +2,7 @@
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
 #include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define MAX_DOUBLET_USES 4
@@ -22,8 +23,8 @@
 #define STATS_RED_Y_START                                                      \
   SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
 
-#define WHITE_CHECKER_CHAR "W"
-#define RED_CHECKER_CHAR "R"
+#define WHITE_CHECKER_CHAR 'W'
+#define RED_CHECKER_CHAR 'R'
 
 #define checker_char(checker_kind)                                             \
   checker_kind == White ? WHITE_CHECKER_CHAR : RED_CHECKER_CHAR
@@ -119,7 +120,7 @@ void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
   if (board_point->checker_count == 0 || board_point->checker_kind == None)
     return;
 
-  char *out = checker_char(board_point->checker_kind);
+  char out = checker_char(board_point->checker_kind);
 
   bool on_bottom = id >= HALF_BOARD;
   int y, x, move_by;
@@ -145,7 +146,7 @@ void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
   if (draw_count > BOARD_ROW_COUNT)
     draw_count = BOARD_ROW_COUNT - 1;
   for (int i = 0; i < draw_count; i++) {
-    mv_printf_yx(win_wrapper, y, x, out);
+    mv_printf_yx(win_wrapper, y, x, "%c", out);
     y += move_by;
   }
 
@@ -159,7 +160,7 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
   if (board_point->checker_count == 0 || board_point->checker_kind == None)
     return;
 
-  char *out = checker_char(board_point->checker_kind);
+  char out = checker_char(board_point->checker_kind);
 
   int start_y, move_dir;
   if (board_point->checker_kind == Red) {
@@ -176,7 +177,7 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
     int row = i / 3;
 
     mv_printf_yx(win_wrapper, start_y + row * move_dir, BOARD_WIDTH / 2 + col,
-                 out);
+                 "%c", out);
   }
 }
 
@@ -280,6 +281,177 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   GameManager game_manager = {default_board(), white, red, curr_player,
                               dice_roll};
   return game_manager;
+}
+
+int serialize_game(GameManager *game_manager, char *filename) {
+  FILE *fp = fopen(filename, "w");
+
+  fprintf(fp, "BOARD\n");
+  fprintf(fp, "\n");
+  Board *board = &game_manager->board;
+
+  for (int i = 0; i < BOARD_SIZE; i++) {
+    if (board->board_points[i].checker_kind == None ||
+        board->board_points[i].checker_count == 0)
+      continue;
+    if (!fprintf(fp, "point #%d %c %d\n", i,
+                 checker_char(board->board_points[i].checker_kind),
+                 board->board_points[i].checker_count))
+      return 1;
+  }
+  fprintf(fp, "\n");
+  fprintf(fp, "bar %c %d\n", checker_char(board->white_bar.checker_kind),
+          board->white_bar.checker_count);
+  fprintf(fp, "bar %c %d\n", checker_char(board->red_bar.checker_kind),
+          board->red_bar.checker_count);
+
+  fprintf(fp, "\n");
+  fprintf(fp, "out %c %d\n", checker_char(White), board->white_out_count);
+  fprintf(fp, "out %c %d\n", checker_char(Red), board->red_out_count);
+
+  fprintf(fp, "\n");
+  DiceRoll *dice_roll = &game_manager->dice_roll;
+  fprintf(fp, "player %c\n", checker_char(game_manager->curr_player));
+  fprintf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", dice_roll->v1, dice_roll->v2,
+          dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
+
+  fclose(fp);
+  return 0;
+}
+
+CheckerKind checker_kind_from_char(char c) {
+  switch (c) {
+  case WHITE_CHECKER_CHAR:
+    return White;
+  case RED_CHECKER_CHAR:
+    return Red;
+  default:
+    return None;
+  }
+}
+
+int scan_board_points(Board *board, FILE *fp, int *white_count,
+                      int *red_count) {
+  int checker_count, id;
+  char checker_char;
+  CheckerKind checker_kind;
+
+  while (1) {
+    int scanned =
+        fscanf(fp, "point #%d %c %d\n", &id, &checker_char, &checker_count);
+    if (scanned < 3)
+      break;
+
+    if (checker_char == WHITE_CHECKER_CHAR) {
+      checker_kind = White;
+      *white_count += checker_count;
+    } else if (checker_char == RED_CHECKER_CHAR) {
+      checker_kind = Red;
+      *red_count += checker_count;
+    } else {
+      return 1;
+    }
+
+    board->board_points[id].checker_count = checker_count;
+    board->board_points[id].checker_kind = checker_kind;
+  }
+  return 0;
+}
+
+int scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
+  int checker_count;
+  char checker_char;
+
+  if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
+    return 1;
+  if (checker_char != WHITE_CHECKER_CHAR)
+    return 1;
+  board->white_bar.checker_count = checker_count;
+  board->white_bar.checker_kind = White;
+  *white_count += checker_count;
+
+  if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
+    return 1;
+  if (checker_char != RED_CHECKER_CHAR)
+    return 1;
+  board->red_bar.checker_count = checker_count;
+  board->red_bar.checker_kind = Red;
+  *red_count += checker_count;
+
+  return 0;
+}
+
+int scan_board_out(Board *board, FILE *fp, int *white_count, int *red_count) {
+  int checker_count;
+  char checker_char;
+
+  if (fscanf(fp, "out %c %d\n", &checker_char, &checker_count) < 2)
+    return 1;
+  if (checker_char != WHITE_CHECKER_CHAR)
+    return 1;
+  board->white_out_count = checker_count;
+  *white_count += checker_count;
+
+  if (fscanf(fp, "out %c %d\n", &checker_char, &checker_count) < 2)
+    return 1;
+  if (checker_char != RED_CHECKER_CHAR)
+    return 1;
+  board->red_out_count = checker_count;
+  *red_count += checker_count;
+
+  return 0;
+}
+
+int scan_player_roll(GameManager *game_manager, FILE *fp) {
+  char checker_char;
+  if (fscanf(fp, "player %c\n", &checker_char) < 1)
+    return 1;
+
+  game_manager->curr_player = checker_kind_from_char(checker_char);
+  if (game_manager->curr_player == None)
+    return 1;
+
+  int v1, v2, used1, used2, doublet_times_used;
+  int scanned = fscanf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d", &v1, &v2, &used1,
+                       &used2, &doublet_times_used);
+  if (scanned < 5)
+    return 1;
+
+  game_manager->dice_roll.v1 = v1;
+  game_manager->dice_roll.v2 = v2;
+  game_manager->dice_roll.used1 = used1;
+  game_manager->dice_roll.used2 = used2;
+  game_manager->dice_roll.doublet_times_used = doublet_times_used;
+
+  return 0;
+}
+
+int scan_game_board(GameManager *game_manager, FILE *fp) {
+  Board board = empty_board();
+
+  int white_count = 0, red_count = 0;
+
+  if (scan_board_points(&board, fp, &white_count, &red_count))
+    return 1;
+  if (scan_board_bar(&board, fp, &white_count, &red_count))
+    return 1;
+  if (scan_board_out(&board, fp, &white_count, &red_count))
+    return 1;
+  if (scan_player_roll(game_manager, fp))
+    return 1;
+  game_manager->board = board;
+
+  return white_count + red_count != 2 * CHECKER_COUNT;
+}
+int deserialize_game(GameManager *out_game, char *filename) {
+  FILE *fp = fopen(filename, "r");
+
+  fscanf(fp, "BOARD\n");
+
+  int code = scan_game_board(out_game, fp);
+  fclose(fp);
+
+  return code;
 }
 
 void swap_players(GameManager *game_manager) {
@@ -662,7 +834,10 @@ void game_loop(WinManager *win_manager) {
 
   clear_refresh_win(&win_manager->io_win);
 
-  GameManager game_manager = new_game_manager("white", "red");
+  // GameManager game_manager = new_game_manager("white", "red");
+  GameManager game_manager;
+  if (deserialize_game(&game_manager, "test.txt"))
+    return;
 
   enable_cursor();
   while (true) {
@@ -684,6 +859,7 @@ void game_loop(WinManager *win_manager) {
       break;
     }
   }
+  serialize_game(&game_manager, "test.txt");
   clear_refresh_win(&win_manager->io_win);
   clear_refresh_win(&win_manager->stats_win);
   disable_cursor();
