@@ -1,6 +1,8 @@
 #include "../headers/game.h"
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
+
+#include "vec.c"
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -188,6 +190,41 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
 }
 
 typedef struct {
+  int from, by;
+} MoveEntry;
+
+typedef struct {
+  DiceRoll dice_roll;
+  CheckerKind checker_kind;
+  MoveEntry moves[MAX_DOUBLET_USES];
+} TurnEntry;
+
+typedef struct {
+  Vec vec;
+} MoveLog;
+
+void create_move_log(MoveLog *move_log_out) {
+  Vec vec;
+  vec_new(&vec, sizeof(TurnEntry));
+  if (vec.data == NULL) {
+    exit(1);
+  }
+  move_log_out->vec = vec;
+}
+
+void push_to_move_log(MoveLog *move_log, TurnEntry *turn_entry) {
+  if (move_log->vec.len + 1 >= move_log->vec.cap) {
+    if (vec_extend(&move_log->vec) == 1) {
+      exit(1);
+    }
+  }
+
+  TurnEntry *data = move_log->vec.data;
+  data[move_log->vec.len] = *turn_entry;
+  move_log->vec.len++;
+}
+
+typedef struct {
   BoardPoint board_points[BOARD_SIZE];
   BoardPoint white_bar;
   BoardPoint red_bar;
@@ -269,6 +306,7 @@ typedef struct {
   CheckerKind curr_player;
   DiceRoll dice_roll;
 
+  MoveLog move_log;
 } GameManager;
 
 GameManager new_game_manager(const char *white_name, const char *red_name) {
@@ -283,9 +321,11 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   if (dice_roll.v1 < dice_roll.v2) {
     curr_player = Red;
   }
+  MoveLog move_log;
+  create_move_log(&move_log);
 
-  GameManager game_manager = {default_board(), white, red, curr_player,
-                              dice_roll};
+  GameManager game_manager = {default_board(), white,     red,
+                              curr_player,     dice_roll, move_log};
   return game_manager;
 }
 
