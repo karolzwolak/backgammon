@@ -4,6 +4,10 @@
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define FILE_HEADER "BOARD"
 
 #define MAX_DOUBLET_USES 4
 
@@ -14,6 +18,8 @@
 #define RED_OUT_START BOARD_SIZE
 
 #define CHECKER_COUNT 15
+
+#define MAX_FILENAME_LEN 100
 
 #define STATS_LINES_COUNT 3
 #define STATS_GAP 3
@@ -286,7 +292,10 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
 int serialize_game(GameManager *game_manager, char *filename) {
   FILE *fp = fopen(filename, "w");
 
-  fprintf(fp, "BOARD\n");
+  if (fp == NULL)
+    return 1;
+
+  fprintf(fp, "%s\n", FILE_HEADER);
   fprintf(fp, "\n");
   Board *board = &game_manager->board;
 
@@ -430,6 +439,11 @@ int scan_game_board(GameManager *game_manager, FILE *fp) {
   Board board = empty_board();
 
   int white_count = 0, red_count = 0;
+  char header[MAX_INPUT_LEN];
+  if (fscanf(fp, "%s\n", header) == 0)
+    return 1;
+  if (strcmp(header, FILE_HEADER) != 0)
+    return 1;
 
   if (scan_board_points(&board, fp, &white_count, &red_count))
     return 1;
@@ -443,13 +457,27 @@ int scan_game_board(GameManager *game_manager, FILE *fp) {
 
   return white_count + red_count != 2 * CHECKER_COUNT;
 }
-int deserialize_game(GameManager *out_game, char *filename) {
-  FILE *fp = fopen(filename, "r");
 
-  fscanf(fp, "BOARD\n");
+int deserialize_game(WinManager *win_manager, GameManager *out_game,
+                     char *filename) {
+
+  FILE *fp = fopen(filename, "r");
+  refresh_win(&win_manager->io_win);
+  if (fp == 0) {
+    printf_centered_on_new_line(&win_manager->io_win, "Cannot access file '%s'",
+                                filename);
+    return 1;
+  }
 
   int code = scan_game_board(out_game, fp);
+
   fclose(fp);
+
+  if (code == 1) {
+    printf_centered_on_new_line(&win_manager->io_win, "Wrong data in file '%s'",
+                                filename);
+    return 1;
+  }
 
   return code;
 }
@@ -733,11 +761,6 @@ int input_int(WinWrapper *io_wrapper, const char *prompt) {
   return res;
 }
 
-void clear_refresh_win(WinWrapper *win_wrapper) {
-  clear_win(win_wrapper);
-  refresh_win(win_wrapper);
-}
-
 void init_game(WinManager *win_manager, GameManager *game_manager) {
   char white_name[MAX_INPUT_LEN];
   char red_name[MAX_INPUT_LEN];
@@ -828,24 +851,16 @@ CheckerKind check_game_over(GameManager *game_manager) {
     return Red;
   return None;
 }
-
-void game_loop(WinManager *win_manager) {
-  disable_cursor();
-
+void game_loop(WinManager *win_manager, GameManager *game_manager) {
+  enable_cursor();
   clear_refresh_win(&win_manager->io_win);
 
-  // GameManager game_manager = new_game_manager("white", "red");
-  GameManager game_manager;
-  if (deserialize_game(&game_manager, "test.txt"))
-    return;
-
-  enable_cursor();
   while (true) {
-    display_game(win_manager, &game_manager);
-    if (play_turn(win_manager, &game_manager)) {
+    display_game(win_manager, game_manager);
+    if (play_turn(win_manager, game_manager)) {
       break;
     }
-    CheckerKind won = check_game_over(&game_manager);
+    CheckerKind won = check_game_over(game_manager);
     if (won != None) {
       clear_refresh_win(&win_manager->content_win);
       mv_printf_centered(&win_manager->content_win, CONTENT_Y_END / 2,
@@ -858,9 +873,72 @@ void game_loop(WinManager *win_manager) {
       win_char_input(&win_manager->io_win);
       break;
     }
+    disable_cursor();
+    clear_refresh_win(&win_manager->io_win);
+    clear_refresh_win(&win_manager->content_win);
   }
-  serialize_game(&game_manager, "test.txt");
+
+  serialize_game(game_manager, "test.txt");
   clear_refresh_win(&win_manager->io_win);
   clear_refresh_win(&win_manager->stats_win);
   disable_cursor();
+}
+
+void print_play_menu(WinWrapper *win_wrapper) {
+  mv_printf_centered(win_wrapper, CONTENT_Y_END / 2, "New game");
+  mv_printf_centered(win_wrapper, CONTENT_Y_END / 2 + 2, "Load game");
+}
+
+void display_play_menu(WinManager *win_manager) {
+  clear_win(&win_manager->content_win);
+  print_play_menu(&win_manager->content_win);
+  refresh_win(&win_manager->content_win);
+}
+
+int play_load_game(WinManager *win_manager) {
+  enable_cursor();
+  clear_win(&win_manager->io_win);
+
+  char filename[MAX_FILENAME_LEN];
+  prompt_input(&win_manager->io_win, "Load from file: ", filename);
+
+  disable_cursor();
+  GameManager game_manager;
+  if (deserialize_game(win_manager, &game_manager, filename) == 1) {
+    refresh_win(&win_manager->io_win);
+    return 1;
+  }
+
+  game_loop(win_manager, &game_manager);
+
+  return 0;
+}
+
+int play_new_game(WinManager *win_manager) {
+  enable_cursor();
+
+  GameManager game_manager;
+  game_manager = new_game_manager("white", "red");
+  game_loop(win_manager, &game_manager);
+
+  return 0;
+}
+
+void play_menu_loop(WinManager *win_manager) {
+
+  clear_refresh_win(&win_manager->io_win);
+  while (true) {
+    display_play_menu(win_manager);
+    switch (char_input()) {
+    case 'l':
+      if (play_load_game(win_manager) == 0)
+        return;
+      break;
+    case 'n':
+      play_new_game(win_manager);
+      return;
+    case 'q':
+      return;
+    }
+  }
 }

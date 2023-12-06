@@ -100,9 +100,9 @@ void menu_loop(WinManager *win_manager) {
     case 'q':
       return;
     case 'p':
-      // enable_cursor();
-      game_loop(win_manager);
-      disable_cursor();
+      play_menu_loop(win_manager);
+      clear_refresh_win(&win_manager->stats_win);
+      clear_refresh_win(&win_manager->io_win);
       break;
     default:
       break;
@@ -127,6 +127,5 @@ void run() {
   show_about_info(&win_manager.about_win);
   menu_loop(&win_manager);
 
-  /* menu_loop(&win_manager); */
   free_win_manager(&win_manager);
 }

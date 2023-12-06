@@ -44,3 +44,4 @@ void prompt_input(WinWrapper *io_wrapper, const char *prompt, char *res);
 bool int_prompt_input_untill(WinWrapper *io_wrapper, const char *prompt,
                              int *res);
 bool int_prompt_input(WinWrapper *io_wrapper, const char *prompt, int *res);
+void clear_refresh_win(WinWrapper *win_wrapper);

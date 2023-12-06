@@ -141,3 +141,8 @@ bool int_prompt_input_untill(WinWrapper *io_wrapper, const char *prompt,
   }
   return quit;
 }
+
+void clear_refresh_win(WinWrapper *win_wrapper) {
+  clear_win(win_wrapper);
+  refresh_win(win_wrapper);
+}

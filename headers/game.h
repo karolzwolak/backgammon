@@ -12,4 +12,4 @@ const int CONTENT_Y_END = BOARD_HEIGHT - CONTENT_VERTICAL_MARGIN;
 const int CONTENT_X_START = CONTENT_HORIZONTAL_MARGIN + 1;
 const int CONTENT_X_END = BOARD_WIDTH - CONTENT_HORIZONTAL_MARGIN;
 
-void game_loop(WinManager *win_manager);
+void play_menu_loop(WinManager *win_manager);
