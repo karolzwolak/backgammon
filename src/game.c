@@ -21,7 +21,12 @@
 #define WHITE_OUT_START -1
 #define RED_OUT_START BOARD_SIZE
 
+#define WHITE_DIR -1
+#define RED_DIR 1
+#define CHECKER_DIR(checker_kind) checker_kind == White ? WHITE_DIR : RED_DIR
+
 #define CHECKER_COUNT 15
+#define BAR_WIDTH 3
 
 #define MAX_FILENAME_LEN 100
 
@@ -172,18 +177,17 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
 
   char out = checker_char(board_point->checker_kind);
 
-  int start_y, move_dir;
+  int start_y, move_dir = CHECKER_DIR(board_point->checker_kind);
+
   if (board_point->checker_kind == Red) {
     start_y = CONTENT_Y_START + 1;
-    move_dir = 1;
   } else {
     start_y = CONTENT_Y_END - 1;
-    move_dir = -1;
   }
 
   for (int i = 0; i < board_point->checker_count; i++) {
-    int col = i % 3;
-    int row = i / 3;
+    int col = i % BAR_WIDTH;
+    int row = i / BAR_WIDTH;
 
     mv_printf_yx(win_wrapper, start_y + row * move_dir, BOARD_WIDTH / 2 + col,
                  "%c", out);
@@ -223,7 +227,7 @@ bool deserialize_turn_entry(TurnEntry *turn_entry, FILE *fp) {
   int scanned =
       fscanf(fp, "turn dice:%d dice:%d move_count:%d\n", &turn_entry->dice1,
              &turn_entry->dice2, &turn_entry->move_count);
-  if (scanned < 3)
+  if (scanned < 3 || turn_entry->move_count > MAX_DOUBLET_USES)
     return false;
   for (int i = 0; i < turn_entry->move_count; i++) {
     if (!deserialize_move_entry(&turn_entry->moves[i], fp))
@@ -238,8 +242,6 @@ void turn_entry_new(TurnEntry *turn_entry, DiceRoll *dice_roll) {
 
 void turn_entry_add_move(TurnEntry *turn_entry, int from, int by,
                          bool hit_enemy) {
-  if (turn_entry->move_count >= MAX_DOUBLET_USES)
-    exit(3);
   turn_entry->moves[turn_entry->move_count] = (MoveEntry){from, by, hit_enemy};
   turn_entry->move_count++;
 }

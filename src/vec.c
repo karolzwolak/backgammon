@@ -21,14 +21,16 @@ void vec_new(Vec *vec_out, size_t elem_size) {
 int vec_extend(Vec *vec) {
   if (vec == NULL)
     return 1;
-  void *new_data = malloc(vec->cap * 2 * vec->elem_size);
+
+  vec->cap *= GROWTH_FACTOR;
+  void *new_data = malloc(vec->cap * vec->elem_size);
+
   if (new_data == NULL)
     return 1;
 
   memcpy(new_data, vec->data, vec->len * vec->elem_size);
   free(vec->data);
   vec->data = new_data;
-  vec->cap *= 2;
   return 0;
 }
 

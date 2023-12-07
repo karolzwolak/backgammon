@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #define DEFAULT_CAP 10
+#define GROWTH_FACTOR 2
 #define NO_HEAP_MEM_EXIT 2
 
 typedef struct {
