@@ -1,6 +1,5 @@
 #include "../headers/vec.h"
 #include <stdlib.h>
-#include <string.h>
 
 void vec_with_cap(Vec *vec_out, size_t elem_size, int cap) {
   void *data = malloc(cap * elem_size);
@@ -23,14 +22,11 @@ int vec_extend(Vec *vec) {
     return 1;
 
   vec->cap *= GROWTH_FACTOR;
-  void *new_data = malloc(vec->cap * vec->elem_size);
+  vec->data = realloc(vec->data, vec->cap * vec->elem_size);
 
-  if (new_data == NULL)
+  if (vec->data == NULL)
     return 1;
 
-  memcpy(new_data, vec->data, vec->len * vec->elem_size);
-  free(vec->data);
-  vec->data = new_data;
   return 0;
 }
 
