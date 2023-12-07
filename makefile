@@ -10,6 +10,9 @@ main: main.c
 release:
 	$(COMPILER) $(FLAGS) -O2 main.c 
 
+run: main
+	./bin
+
 clean:
 	rm bin
 
