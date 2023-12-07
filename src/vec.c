@@ -8,6 +8,7 @@ void vec_new(Vec *vec_out, size_t elem_size) {
     vec_out->data = NULL;
     return;
   }
+  vec_out->elem_size = elem_size;
   vec_out->data = data;
   vec_out->cap = DEFAULT_CAP;
   vec_out->len = 0;

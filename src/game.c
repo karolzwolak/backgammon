@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #define FILE_HEADER "BOARD"
+#define MOVE_LOG_HEADER "\nHISTORY"
 
 #define MAX_DOUBLET_USES 4
 
@@ -174,7 +175,6 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
   if (board_point->checker_kind == Red) {
     start_y = CONTENT_Y_START + 1;
     move_dir = 1;
-
   } else {
     start_y = CONTENT_Y_END - 1;
     move_dir = -1;
@@ -237,6 +237,8 @@ void turn_entry_new(TurnEntry *turn_entry, DiceRoll *dice_roll) {
 
 void turn_entry_add_move(TurnEntry *turn_entry, int from, int by,
                          bool hit_enemy) {
+  if (turn_entry->move_count >= MAX_DOUBLET_USES)
+    exit(3);
   turn_entry->moves[turn_entry->move_count] = (MoveEntry){from, by, hit_enemy};
   turn_entry->move_count++;
 }
@@ -258,6 +260,7 @@ void push_to_move_log(MoveLog *move_log, TurnEntry *turn_entry) {
   if (move_log->vec.len + 1 >= move_log->vec.cap) {
     if (vec_extend(&move_log->vec) == 1) {
       exit(NO_HEAP_MEM_EXIT);
+      return;
     }
   }
 
@@ -266,17 +269,22 @@ void push_to_move_log(MoveLog *move_log, TurnEntry *turn_entry) {
   move_log->vec.len++;
 }
 
+TurnEntry *move_log_at(MoveLog *move_log, int id) {
+  if (id < 0 || id >= move_log->vec.len)
+    return NULL;
+  TurnEntry *data = move_log->vec.data;
+  return &data[id];
+}
+
 TurnEntry *move_log_last_turn(MoveLog *move_log) {
   int id = move_log->vec.len - 1;
-  if (id == -1)
-    return NULL;
-  return (TurnEntry *)(move_log->vec.data + id);
+  return move_log_at(move_log, id);
 }
 
 void serialize_move_log(MoveLog *move_log, FILE *fp) {
-  fprintf(fp, "HISTORY len:%d\n", move_log->vec.len);
+  fprintf(fp, "%s len:%d\n", MOVE_LOG_HEADER, move_log->vec.len);
   for (int i = 0; i < move_log->vec.len; i++) {
-    serialize_turn_entry((TurnEntry *)(move_log->vec.data + i), fp);
+    serialize_turn_entry(move_log_at(move_log, i), fp);
   }
 }
 
@@ -952,7 +960,6 @@ bool play_turn(WinManager *win_manager, GameManager *game_manager) {
 
   while (!dice_roll_used(&game_manager->dice_roll) &&
          any_move_legal(game_manager)) {
-
     if (make_move_loop(win_manager, game_manager))
       return true;
 
