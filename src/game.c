@@ -330,10 +330,11 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
 }
 
 int serialize_game(GameManager *game_manager, char *filename) {
+bool serialize_game(GameManager *game_manager, char *filename) {
   FILE *fp = fopen(filename, "w");
 
   if (fp == NULL)
-    return 1;
+    return false;
 
   fprintf(fp, "%s\n", FILE_HEADER);
   fprintf(fp, "\n");
@@ -346,7 +347,7 @@ int serialize_game(GameManager *game_manager, char *filename) {
     if (!fprintf(fp, "point #%d %c %d\n", i,
                  checker_char(board->board_points[i].checker_kind),
                  board->board_points[i].checker_count))
-      return 1;
+      return false;
   }
   fprintf(fp, "\n");
   fprintf(fp, "bar %c %d\n", checker_char(board->white_bar.checker_kind),
@@ -365,7 +366,7 @@ int serialize_game(GameManager *game_manager, char *filename) {
           dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
 
   fclose(fp);
-  return 0;
+  return true;
 }
 
 CheckerKind checker_kind_from_char(char c) {
@@ -379,8 +380,8 @@ CheckerKind checker_kind_from_char(char c) {
   }
 }
 
-int scan_board_points(Board *board, FILE *fp, int *white_count,
-                      int *red_count) {
+bool scan_board_points(Board *board, FILE *fp, int *white_count,
+                       int *red_count) {
   int checker_count, id;
   char checker_char;
   CheckerKind checker_kind;
@@ -398,73 +399,73 @@ int scan_board_points(Board *board, FILE *fp, int *white_count,
       checker_kind = Red;
       *red_count += checker_count;
     } else {
-      return 1;
+      return false;
     }
 
     board->board_points[id].checker_count = checker_count;
     board->board_points[id].checker_kind = checker_kind;
   }
-  return 0;
+  return true;
 }
 
-int scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
+bool scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
   int checker_count;
   char checker_char;
 
   if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
-    return 1;
+    return false;
   if (checker_char != WHITE_CHECKER_CHAR)
-    return 1;
+    return false;
   board->white_bar.checker_count = checker_count;
   board->white_bar.checker_kind = White;
   *white_count += checker_count;
 
   if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
-    return 1;
+    return false;
   if (checker_char != RED_CHECKER_CHAR)
-    return 1;
+    return false;
   board->red_bar.checker_count = checker_count;
   board->red_bar.checker_kind = Red;
   *red_count += checker_count;
 
-  return 0;
+  return true;
 }
 
-int scan_board_out(Board *board, FILE *fp, int *white_count, int *red_count) {
+bool scan_board_out(Board *board, FILE *fp, int *white_count, int *red_count) {
   int checker_count;
   char checker_char;
 
   if (fscanf(fp, "out %c %d\n", &checker_char, &checker_count) < 2)
-    return 1;
+    return false;
   if (checker_char != WHITE_CHECKER_CHAR)
-    return 1;
+    return false;
   board->white_out_count = checker_count;
   *white_count += checker_count;
 
   if (fscanf(fp, "out %c %d\n", &checker_char, &checker_count) < 2)
-    return 1;
+    return false;
   if (checker_char != RED_CHECKER_CHAR)
-    return 1;
+    return false;
   board->red_out_count = checker_count;
   *red_count += checker_count;
 
-  return 0;
+  return true;
 }
 
-int scan_player_roll(GameManager *game_manager, FILE *fp) {
+bool scan_player_roll(GameManager *game_manager, FILE *fp) {
   char checker_char;
   if (fscanf(fp, "player %c\n", &checker_char) < 1)
-    return 1;
+    return false;
 
   game_manager->curr_player = checker_kind_from_char(checker_char);
   if (game_manager->curr_player == None)
-    return 1;
+    return false;
 
   int v1, v2, used1, used2, doublet_times_used;
   int scanned = fscanf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d", &v1, &v2, &used1,
                        &used2, &doublet_times_used);
   if (scanned < 5)
-    return 1;
+    return false;
 
   game_manager->dice_roll.v1 = v1;
   game_manager->dice_roll.v2 = v2;
@@ -472,54 +473,53 @@ int scan_player_roll(GameManager *game_manager, FILE *fp) {
   game_manager->dice_roll.used2 = used2;
   game_manager->dice_roll.doublet_times_used = doublet_times_used;
 
-  return 0;
+  return true;
 }
 
-int scan_game_board(GameManager *game_manager, FILE *fp) {
+bool scan_game_board(GameManager *game_manager, FILE *fp) {
   Board board = empty_board();
 
   int white_count = 0, red_count = 0;
   char header[MAX_INPUT_LEN];
   if (fscanf(fp, "%s\n", header) == 0)
-    return 1;
+    return false;
   if (strcmp(header, FILE_HEADER) != 0)
-    return 1;
+    return false;
 
-  if (scan_board_points(&board, fp, &white_count, &red_count))
-    return 1;
-  if (scan_board_bar(&board, fp, &white_count, &red_count))
-    return 1;
-  if (scan_board_out(&board, fp, &white_count, &red_count))
-    return 1;
-  if (scan_player_roll(game_manager, fp))
-    return 1;
+  if (!scan_board_points(&board, fp, &white_count, &red_count))
+    return false;
+  if (!scan_board_bar(&board, fp, &white_count, &red_count))
+    return false;
+  if (!scan_board_out(&board, fp, &white_count, &red_count))
+    return false;
+  if (!scan_player_roll(game_manager, fp))
+    return false;
   game_manager->board = board;
 
-  return white_count + red_count != 2 * CHECKER_COUNT;
+  return white_count + red_count == 2 * CHECKER_COUNT;
 }
 
-int deserialize_game(WinManager *win_manager, GameManager *out_game,
-                     char *filename) {
+bool deserialize_game(WinManager *win_manager, GameManager *out_game,
+                      char *filename) {
 
   FILE *fp = fopen(filename, "r");
   refresh_win(&win_manager->io_win);
-  if (fp == 0) {
+  if (fp == NULL) {
     printf_centered_on_new_line(&win_manager->io_win, "Cannot access file '%s'",
                                 filename);
-    return 1;
+    return false;
   }
 
-  int code = scan_game_board(out_game, fp);
+  int success = scan_game_board(out_game, fp);
 
   fclose(fp);
 
-  if (code == 1) {
+  if (!success) {
     printf_centered_on_new_line(&win_manager->io_win, "Wrong data in file '%s'",
                                 filename);
-    return 1;
   }
 
-  return code;
+  return success;
 }
 
 void swap_players(GameManager *game_manager) {
@@ -935,7 +935,7 @@ void display_play_menu(WinManager *win_manager) {
   refresh_win(&win_manager->content_win);
 }
 
-int play_load_game(WinManager *win_manager) {
+bool play_load_game(WinManager *win_manager) {
   enable_cursor();
   clear_win(&win_manager->io_win);
 
@@ -944,24 +944,24 @@ int play_load_game(WinManager *win_manager) {
 
   disable_cursor();
   GameManager game_manager;
-  if (deserialize_game(win_manager, &game_manager, filename) == 1) {
+  if (!deserialize_game(win_manager, &game_manager, filename)) {
     refresh_win(&win_manager->io_win);
-    return 1;
+    return false;
   }
 
   game_loop(win_manager, &game_manager);
 
-  return 0;
+  return true;
 }
 
-int play_new_game(WinManager *win_manager) {
+bool play_new_game(WinManager *win_manager) {
   enable_cursor();
 
   GameManager game_manager;
   game_manager = new_game_manager("white", "red");
   game_loop(win_manager, &game_manager);
 
-  return 0;
+  return true;
 }
 
 void play_menu_loop(WinManager *win_manager) {
@@ -971,7 +971,7 @@ void play_menu_loop(WinManager *win_manager) {
     display_play_menu(win_manager);
     switch (char_input()) {
     case 'l':
-      if (play_load_game(win_manager) == 0)
+      if (play_load_game(win_manager))
         return;
       break;
     case 'n':
