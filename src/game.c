@@ -190,14 +190,56 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
 }
 
 typedef struct {
-  int from, by;
+  int from, by, hit_enemy;
 } MoveEntry;
 
+void serialize_move_entry(MoveEntry *move_entry, FILE *fp) {
+  fprintf(fp, "move f:%d b:%d h:%d\n", move_entry->from, move_entry->by,
+          move_entry->hit_enemy);
+}
+
+bool deserialize_move_entry(MoveEntry *move_entry, FILE *fp) {
+  int scanned = fscanf(fp, "move f:%d b:%d h:%d\n", &move_entry->from,
+                       &move_entry->by, &move_entry->hit_enemy);
+  return scanned == 3;
+}
+
 typedef struct {
-  DiceRoll dice_roll;
-  CheckerKind checker_kind;
+  int dice1, dice2;
   MoveEntry moves[MAX_DOUBLET_USES];
+  int move_count;
 } TurnEntry;
+
+void serialize_turn_entry(TurnEntry *turn_entry, FILE *fp) {
+  fprintf(fp, "turn dice:%d dice:%d move_count:%d\n", turn_entry->dice1,
+          turn_entry->dice2, turn_entry->move_count);
+  for (int i = 0; i < turn_entry->move_count; i++) {
+    serialize_move_entry(&turn_entry->moves[i], fp);
+  }
+}
+
+bool deserialize_turn_entry(TurnEntry *turn_entry, FILE *fp) {
+  int scanned =
+      fscanf(fp, "turn dice1:%d dice2:%d move_count:%d\n", &turn_entry->dice1,
+             &turn_entry->dice2, &turn_entry->move_count);
+  if (scanned < 3)
+    return false;
+  for (int i = 0; i < turn_entry->move_count; i++) {
+    if (!deserialize_move_entry(&turn_entry->moves[i], fp))
+      return false;
+  }
+  return true;
+}
+
+void turn_entry_new(TurnEntry *turn_entry, DiceRoll *dice_roll) {
+  *turn_entry = (TurnEntry){dice_roll->v1, dice_roll->v2, {}, 0};
+}
+
+void turn_entry_add_move(TurnEntry *turn_entry, int from, int by,
+                         bool hit_enemy) {
+  turn_entry->moves[turn_entry->move_count] = (MoveEntry){from, by, hit_enemy};
+  turn_entry->move_count++;
+}
 
 typedef struct {
   Vec vec;
@@ -207,7 +249,7 @@ void create_move_log(MoveLog *move_log_out) {
   Vec vec;
   vec_new(&vec, sizeof(TurnEntry));
   if (vec.data == NULL) {
-    exit(1);
+    exit(NO_HEAP_MEM_EXIT);
   }
   move_log_out->vec = vec;
 }
@@ -215,13 +257,27 @@ void create_move_log(MoveLog *move_log_out) {
 void push_to_move_log(MoveLog *move_log, TurnEntry *turn_entry) {
   if (move_log->vec.len + 1 >= move_log->vec.cap) {
     if (vec_extend(&move_log->vec) == 1) {
-      exit(1);
+      exit(NO_HEAP_MEM_EXIT);
     }
   }
 
   TurnEntry *data = move_log->vec.data;
   data[move_log->vec.len] = *turn_entry;
   move_log->vec.len++;
+}
+
+TurnEntry *move_log_last_turn(MoveLog *move_log) {
+  int id = move_log->vec.len - 1;
+  if (id == -1)
+    return NULL;
+  return (TurnEntry *)(move_log->vec.data + id);
+}
+
+void serialize_move_log(MoveLog *move_log, FILE *fp) {
+  fprintf(fp, "HISTORY len:%d\n", move_log->vec.len);
+  for (int i = 0; i < move_log->vec.len; i++) {
+    serialize_turn_entry((TurnEntry *)(move_log->vec.data + i), fp);
+  }
 }
 
 typedef struct {
@@ -329,7 +385,19 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   return game_manager;
 }
 
-int serialize_game(GameManager *game_manager, char *filename) {
+void free_game_manager(GameManager *game_manager) {
+  vec_free(&game_manager->move_log.vec);
+}
+
+void game_add_move_entry(GameManager *game_manager, int from, int by,
+                         bool hit_enemy) {
+  TurnEntry *turn_entry = move_log_last_turn(&game_manager->move_log);
+  if (turn_entry == NULL)
+    exit(NO_HEAP_MEM_EXIT);
+
+  turn_entry_add_move(turn_entry, from, by, hit_enemy);
+}
+
 bool serialize_game(GameManager *game_manager, char *filename) {
   FILE *fp = fopen(filename, "w");
 
@@ -364,6 +432,8 @@ bool serialize_game(GameManager *game_manager, char *filename) {
   fprintf(fp, "player %c\n", checker_char(game_manager->curr_player));
   fprintf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", dice_roll->v1, dice_roll->v2,
           dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
+
+  serialize_move_log(&game_manager->move_log, fp);
 
   fclose(fp);
   return true;
@@ -624,12 +694,16 @@ bool player_move(GameManager *game_manager, int from, int move_by) {
       board->red_out_count++;
     return true;
   }
+  bool hit_enemy = false;
 
   if (board->board_points[dest].checker_kind != game_manager->curr_player &&
       board->board_points[dest].checker_count > 0) {
     add_to_bar(board, board->board_points[dest].checker_kind);
     decrement_point(board, dest);
+    hit_enemy = true;
   }
+
+  game_add_move_entry(game_manager, from, move_by, hit_enemy);
   increment_point(board, dest, game_manager->curr_player);
 
   return true;
@@ -648,6 +722,9 @@ bool player_enter(GameManager *game_manager, int move_by) {
 
   int dest = enter_dest(game_manager->curr_player, move_by);
   increment_point(board, dest, game_manager->curr_player);
+
+  // TODO: check for hit
+  game_add_move_entry(game_manager, -1, move_by, false);
 
   return true;
 }
@@ -862,6 +939,10 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
 }
 
 bool play_turn(WinManager *win_manager, GameManager *game_manager) {
+  TurnEntry turn_entry;
+  turn_entry_new(&turn_entry, &game_manager->dice_roll);
+  push_to_move_log(&game_manager->move_log, &turn_entry);
+
   int enter_moves_count = legal_enters_count(game_manager);
   for (int i = 0; i < enter_moves_count; i++) {
     if (make_enter_move_loop(win_manager, game_manager))
@@ -910,18 +991,18 @@ void game_loop(WinManager *win_manager, GameManager *game_manager) {
         printf_centered_on_new_line(&win_manager->content_win, "White Wins!");
       else
         printf_centered_on_new_line(&win_manager->content_win, "Red Wins!");
+
       win_char_input(&win_manager->io_win);
       break;
     }
-    disable_cursor();
-    clear_refresh_win(&win_manager->io_win);
-    clear_refresh_win(&win_manager->content_win);
   }
 
   serialize_game(game_manager, "test.txt");
   clear_refresh_win(&win_manager->io_win);
   clear_refresh_win(&win_manager->stats_win);
   disable_cursor();
+
+  free_game_manager(game_manager);
 }
 
 void print_play_menu(WinWrapper *win_wrapper) {
