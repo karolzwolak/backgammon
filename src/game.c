@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 #define FILE_HEADER "BOARD"
-#define MOVE_LOG_HEADER "\nHISTORY"
+#define TURN_LOG_HEADER "HISTORY"
 
 #define MAX_DOUBLET_USES 4
 
@@ -220,7 +220,7 @@ void serialize_turn_entry(TurnEntry *turn_entry, FILE *fp) {
 
 bool deserialize_turn_entry(TurnEntry *turn_entry, FILE *fp) {
   int scanned =
-      fscanf(fp, "turn dice1:%d dice2:%d move_count:%d\n", &turn_entry->dice1,
+      fscanf(fp, "turn dice:%d dice:%d move_count:%d\n", &turn_entry->dice1,
              &turn_entry->dice2, &turn_entry->move_count);
   if (scanned < 3)
     return false;
@@ -245,47 +245,67 @@ void turn_entry_add_move(TurnEntry *turn_entry, int from, int by,
 
 typedef struct {
   Vec vec;
-} MoveLog;
+} TurnLog;
 
-void create_move_log(MoveLog *move_log_out) {
+void new_turn_log(TurnLog *turn_log_out, int cap) {
   Vec vec;
-  vec_new(&vec, sizeof(TurnEntry));
+  if (cap <= 0) {
+    vec_new(&vec, sizeof(TurnEntry));
+  } else {
+    vec_with_cap(&vec, sizeof(TurnEntry), cap);
+  }
   if (vec.data == NULL) {
     exit(NO_HEAP_MEM_EXIT);
   }
-  move_log_out->vec = vec;
+  turn_log_out->vec = vec;
 }
 
-void push_to_move_log(MoveLog *move_log, TurnEntry *turn_entry) {
-  if (move_log->vec.len + 1 >= move_log->vec.cap) {
-    if (vec_extend(&move_log->vec) == 1) {
+void push_to_turn_log(TurnLog *turn_log, TurnEntry *turn_entry) {
+  if (turn_log->vec.len + 1 >= turn_log->vec.cap) {
+    if (vec_extend(&turn_log->vec) == 1) {
       exit(NO_HEAP_MEM_EXIT);
       return;
     }
   }
 
-  TurnEntry *data = move_log->vec.data;
-  data[move_log->vec.len] = *turn_entry;
-  move_log->vec.len++;
+  TurnEntry *data = turn_log->vec.data;
+  data[turn_log->vec.len] = *turn_entry;
+  turn_log->vec.len++;
 }
 
-TurnEntry *move_log_at(MoveLog *move_log, int id) {
-  if (id < 0 || id >= move_log->vec.len)
+TurnEntry *turn_at(TurnLog *turn_log, int id) {
+  if (id < 0 || id >= turn_log->vec.len)
     return NULL;
-  TurnEntry *data = move_log->vec.data;
+  TurnEntry *data = turn_log->vec.data;
   return &data[id];
 }
 
-TurnEntry *move_log_last_turn(MoveLog *move_log) {
-  int id = move_log->vec.len - 1;
-  return move_log_at(move_log, id);
+TurnEntry *turn_log_last_turn(TurnLog *turn_log) {
+  int id = turn_log->vec.len - 1;
+  return turn_at(turn_log, id);
 }
 
-void serialize_move_log(MoveLog *move_log, FILE *fp) {
-  fprintf(fp, "%s len:%d\n", MOVE_LOG_HEADER, move_log->vec.len);
-  for (int i = 0; i < move_log->vec.len; i++) {
-    serialize_turn_entry(move_log_at(move_log, i), fp);
+void serialize_turn_log(TurnLog *turn_log, FILE *fp) {
+  fprintf(fp, "\n%s len:%d\n", TURN_LOG_HEADER, turn_log->vec.len);
+  for (int i = 0; i < turn_log->vec.len; i++) {
+    serialize_turn_entry(turn_at(turn_log, i), fp);
   }
+}
+
+bool deserialize_turn_log(TurnLog *turn_log, FILE *fp) {
+  int len;
+  char header[MAX_INPUT_LEN];
+  int scanned = fscanf(fp, "\n%s len:%d\n", header, &len);
+  if (scanned < 2 || strcmp(header, TURN_LOG_HEADER) != 0)
+    return false;
+  new_turn_log(turn_log, len);
+  turn_log->vec.len = len;
+
+  for (int i = 0; i < len; i++) {
+    if (!deserialize_turn_entry(turn_at(turn_log, i), fp))
+      return false;
+  }
+  return true;
 }
 
 typedef struct {
@@ -370,7 +390,7 @@ typedef struct {
   CheckerKind curr_player;
   DiceRoll dice_roll;
 
-  MoveLog move_log;
+  TurnLog turn_log;
 } GameManager;
 
 GameManager new_game_manager(const char *white_name, const char *red_name) {
@@ -385,21 +405,21 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   if (dice_roll.v1 < dice_roll.v2) {
     curr_player = Red;
   }
-  MoveLog move_log;
-  create_move_log(&move_log);
+  TurnLog turn_log;
+  new_turn_log(&turn_log, 0);
 
   GameManager game_manager = {default_board(), white,     red,
-                              curr_player,     dice_roll, move_log};
+                              curr_player,     dice_roll, turn_log};
   return game_manager;
 }
 
 void free_game_manager(GameManager *game_manager) {
-  vec_free(&game_manager->move_log.vec);
+  vec_free(&game_manager->turn_log.vec);
 }
 
 void game_add_move_entry(GameManager *game_manager, int from, int by,
                          bool hit_enemy) {
-  TurnEntry *turn_entry = move_log_last_turn(&game_manager->move_log);
+  TurnEntry *turn_entry = turn_log_last_turn(&game_manager->turn_log);
   if (turn_entry == NULL)
     exit(NO_HEAP_MEM_EXIT);
 
@@ -441,7 +461,7 @@ bool serialize_game(GameManager *game_manager, char *filename) {
   fprintf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", dice_roll->v1, dice_roll->v2,
           dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
 
-  serialize_move_log(&game_manager->move_log, fp);
+  serialize_turn_log(&game_manager->turn_log, fp);
 
   fclose(fp);
   return true;
@@ -540,8 +560,8 @@ bool scan_player_roll(GameManager *game_manager, FILE *fp) {
     return false;
 
   int v1, v2, used1, used2, doublet_times_used;
-  int scanned = fscanf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d", &v1, &v2, &used1,
-                       &used2, &doublet_times_used);
+  int scanned = fscanf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", &v1, &v2,
+                       &used1, &used2, &doublet_times_used);
   if (scanned < 5)
     return false;
 
@@ -588,7 +608,9 @@ bool deserialize_game(WinManager *win_manager, GameManager *out_game,
     return false;
   }
 
-  int success = scan_game_board(out_game, fp);
+  int success = scan_game_board(out_game, fp) &&
+                deserialize_turn_log(&out_game->turn_log, fp);
+  // new_turn_log(&out_game->turn_log, 0);
 
   fclose(fp);
 
@@ -949,7 +971,7 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
 bool play_turn(WinManager *win_manager, GameManager *game_manager) {
   TurnEntry turn_entry;
   turn_entry_new(&turn_entry, &game_manager->dice_roll);
-  push_to_move_log(&game_manager->move_log, &turn_entry);
+  push_to_turn_log(&game_manager->turn_log, &turn_entry);
 
   int enter_moves_count = legal_enters_count(game_manager);
   for (int i = 0; i < enter_moves_count; i++) {
