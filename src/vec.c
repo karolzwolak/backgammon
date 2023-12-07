@@ -2,16 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-void vec_new(Vec *vec_out, size_t elem_size) {
-  void *data = malloc(DEFAULT_CAP * elem_size);
+void vec_with_cap(Vec *vec_out, size_t elem_size, int cap) {
+  void *data = malloc(cap * elem_size);
   if (data == NULL) {
     vec_out->data = NULL;
     return;
   }
   vec_out->elem_size = elem_size;
   vec_out->data = data;
-  vec_out->cap = DEFAULT_CAP;
+  vec_out->cap = cap;
   vec_out->len = 0;
+}
+
+void vec_new(Vec *vec_out, size_t elem_size) {
+  vec_with_cap(vec_out, elem_size, DEFAULT_CAP);
 }
 
 int vec_extend(Vec *vec) {

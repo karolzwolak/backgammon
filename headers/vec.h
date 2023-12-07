@@ -11,6 +11,7 @@ typedef struct {
   int len, cap;
 } Vec;
 
+void vec_with_cap(Vec *vec_out, size_t elem_size, int cap);
 void vec_new(Vec *vec_out, size_t elem_size);
 int vec_extend(Vec *vec);
 void vec_free(Vec *vec);
