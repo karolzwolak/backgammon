@@ -340,8 +340,9 @@ MoveEntry *trav_curr_move(TurnLog *turn_log) {
 void trav_goto_end(TurnLog *turn_log) {
   if (turn_log->vec.len > 0)
     turn_log->trav_turn_id = turn_log->vec.len - 1;
+  // move next move id past the last move
   turn_log->trav_move_id =
-      turn_at(turn_log, turn_log->trav_turn_id)->move_count - 1;
+      turn_at(turn_log, turn_log->trav_turn_id)->move_count;
 }
 
 void trav_goto_start(TurnLog *turn_log) {
@@ -780,20 +781,30 @@ bool is_pos_out(int pos) {
   return pos <= WHITE_OUT_START || pos >= RED_OUT_START;
 }
 
-void move_checker(GameManager *game_manager, int from, int dest, int d_count) {
+void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
   Board *board = &game_manager->board;
   CheckerKind curr_player = game_manager->curr_player;
 
-  if (from == BAR_POS) {
-    add_to_bar(board, curr_player, -d_count);
-  } else {
-    add_to_point(board, from, curr_player, -d_count);
+  if (reverse) {
+    int temp = from;
+    from = dest;
+    dest = temp;
   }
 
-  if (is_pos_out(dest)) {
-    add_to_out(board, curr_player, d_count);
+  if (from == BAR_POS) {
+    add_to_bar(board, curr_player, -1);
+  } else if (is_pos_out(from)) {
+    add_to_out(board, curr_player, -1);
   } else {
-    add_to_point(board, dest, curr_player, d_count);
+    add_to_point(board, from, curr_player, -1);
+  }
+
+  if (dest == BAR_POS) {
+    add_to_bar(board, curr_player, 1);
+  } else if (is_pos_out(dest)) {
+    add_to_out(board, curr_player, 1);
+  } else {
+    add_to_point(board, dest, curr_player, 1);
   }
 }
 
@@ -811,7 +822,7 @@ bool move_checker_check_hit(GameManager *game_manager, int from, int move_by) {
 
     return true;
   }
-  move_checker(game_manager, from, dest, 1);
+  move_checker(game_manager, from, dest, false);
 
   return false;
 }
@@ -825,36 +836,43 @@ void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
   int by = move_entry->by;
   int dest = move_dest(game_manager, from, by);
 
-  move_checker(game_manager, from, dest, d_count);
+  if (reverse)
+    move_checker(game_manager, from, dest, reverse);
+
   if (move_entry->hit_enemy) {
-    CheckerKind enemy = opposite_checker(game_manager->curr_player);
-    add_to_bar(board, enemy, d_count);
-    add_to_point(board, dest, enemy, -d_count);
+    game_manager->curr_player = opposite_checker(game_manager->curr_player);
+    move_checker(game_manager, dest, BAR_POS, reverse);
+    game_manager->curr_player = opposite_checker(game_manager->curr_player);
   }
+
+  if (!reverse)
+    move_checker(game_manager, from, dest, reverse);
 }
 
 void apply_turn_entry(TurnEntry *turn_entry, GameManager *game_manager) {
-  swap_players(game_manager);
+  game_manager->curr_player = opposite_checker(game_manager->curr_player);
   game_manager->dice_roll = new_dice_roll(turn_entry->dice1, turn_entry->dice2);
 }
 
 void trav_apply_move(GameManager *game_manager, bool reverse) {
   TurnLog *turn_log = &game_manager->turn_log;
-  bool next_turn;
+  bool new_turn;
   if (reverse) {
     if (trav_on_start(&game_manager->turn_log))
       return;
+    new_turn = trav_prev_move(turn_log);
+    if (new_turn) {
+      apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
+    }
     apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
-    next_turn = trav_prev_move(turn_log);
   } else {
     if (trav_on_end(&game_manager->turn_log))
       return;
-    next_turn = trav_next_move(turn_log);
     apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
-  }
-
-  if (next_turn) {
-    apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
+    new_turn = trav_next_move(turn_log);
+    if (new_turn) {
+      apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
+    }
   }
 }
 
