@@ -104,6 +104,11 @@ void menu_loop(WinManager *win_manager) {
       clear_refresh_win(&win_manager->stats_win);
       clear_refresh_win(&win_manager->io_win);
       break;
+    case 'w':
+      watch_menu_loop(win_manager);
+      clear_refresh_win(&win_manager->stats_win);
+      clear_refresh_win(&win_manager->io_win);
+      break;
     default:
       break;
     }

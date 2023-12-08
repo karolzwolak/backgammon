@@ -62,9 +62,10 @@ typedef struct {
 
 int roll_dice() { return rand() % 6 + 1; }
 
-DiceRoll new_dice_roll() {
-  return (DiceRoll){roll_dice(), roll_dice(), false, false, 0};
+DiceRoll new_dice_roll(int v1, int v2) {
+  return (DiceRoll){v1, v2, false, false, 0};
 }
+DiceRoll new_random_roll() { return new_dice_roll(roll_dice(), roll_dice()); }
 
 bool can_use_roll_val(DiceRoll *dice_roll, int val) {
   if (dice_roll->v1 == dice_roll->v2) {
@@ -248,6 +249,7 @@ void turn_entry_add_move(TurnEntry *turn_entry, int from, int by,
 
 typedef struct {
   Vec vec;
+  int trav_turn_id, trav_move_id;
 } TurnLog;
 
 void new_turn_log(TurnLog *turn_log_out, int cap) {
@@ -260,7 +262,7 @@ void new_turn_log(TurnLog *turn_log_out, int cap) {
   if (vec.data == NULL) {
     exit(NO_HEAP_MEM_EXIT);
   }
-  turn_log_out->vec = vec;
+  *turn_log_out = (TurnLog){vec, 0, 0};
 }
 
 void push_to_turn_log(TurnLog *turn_log, TurnEntry *turn_entry) {
@@ -286,6 +288,65 @@ TurnEntry *turn_at(TurnLog *turn_log, int id) {
 TurnEntry *turn_log_last_turn(TurnLog *turn_log) {
   int id = turn_log->vec.len - 1;
   return turn_at(turn_log, id);
+}
+
+bool trav_on_end(TurnLog *turn_log) {
+  return turn_log->trav_turn_id + 1 >= turn_log->vec.len &&
+         turn_log->trav_move_id + 1 >=
+             turn_at(turn_log, turn_log->trav_turn_id)->move_count;
+}
+
+bool trav_on_start(TurnLog *turn_log) {
+  return turn_log->trav_turn_id <= 0 && turn_log->trav_move_id <= 0;
+}
+
+bool trav_next_move(TurnLog *turn_log) {
+  if (trav_on_end(turn_log))
+    return false;
+
+  turn_log->trav_move_id++;
+
+  TurnEntry *curr_turn = turn_at(turn_log, turn_log->trav_turn_id);
+  bool new_turn = turn_log->trav_move_id >= curr_turn->move_count;
+
+  if (new_turn) {
+    turn_log->trav_turn_id++;
+    turn_log->trav_move_id = 0;
+  }
+  return new_turn;
+}
+
+bool trav_prev_move(TurnLog *turn_log) {
+  if (trav_on_start(turn_log))
+    return false;
+
+  turn_log->trav_move_id--;
+  bool new_turn = turn_log->trav_move_id == -1;
+
+  if (new_turn) {
+    turn_log->trav_turn_id--;
+    TurnEntry *turn_entry = turn_at(turn_log, turn_log->trav_turn_id);
+    turn_log->trav_move_id = turn_entry->move_count - 1;
+  }
+
+  return new_turn;
+}
+
+MoveEntry *trav_curr_move(TurnLog *turn_log) {
+  TurnEntry *turn_entry = turn_at(turn_log, turn_log->trav_turn_id);
+  return &turn_entry->moves[turn_log->trav_move_id];
+}
+
+void trav_goto_end(TurnLog *turn_log) {
+  if (turn_log->vec.len > 0)
+    turn_log->trav_turn_id = turn_log->vec.len - 1;
+  turn_log->trav_move_id =
+      turn_at(turn_log, turn_log->trav_turn_id)->move_count - 1;
+}
+
+void trav_goto_start(TurnLog *turn_log) {
+  turn_log->trav_turn_id = 0;
+  turn_log->trav_move_id = 0;
 }
 
 void serialize_turn_log(TurnLog *turn_log, FILE *fp) {
@@ -405,10 +466,11 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   Player red = {red_name, Red};
 
   CheckerKind curr_player = White;
-  DiceRoll dice_roll = new_dice_roll();
-  while (dice_roll.v1 == dice_roll.v2) {
-    dice_roll = new_dice_roll();
-  }
+  DiceRoll dice_roll;
+  do {
+    dice_roll = new_random_roll();
+  } while (dice_roll.v1 == dice_roll.v2);
+
   if (dice_roll.v1 < dice_roll.v2) {
     curr_player = Red;
   }
@@ -630,7 +692,7 @@ bool deserialize_game(WinManager *win_manager, GameManager *out_game,
 }
 
 void swap_players(GameManager *game_manager) {
-  game_manager->dice_roll = new_dice_roll();
+  game_manager->dice_roll = new_random_roll();
   if (game_manager->curr_player == White) {
     game_manager->curr_player = Red;
   } else {
@@ -769,6 +831,49 @@ void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
     add_to_bar(board, enemy, d_count);
     add_to_point(board, dest, enemy, -d_count);
   }
+}
+
+void apply_turn_entry(TurnEntry *turn_entry, GameManager *game_manager) {
+  swap_players(game_manager);
+  game_manager->dice_roll = new_dice_roll(turn_entry->dice1, turn_entry->dice2);
+}
+
+void trav_apply_move(GameManager *game_manager, bool reverse) {
+  TurnLog *turn_log = &game_manager->turn_log;
+  bool next_turn;
+  if (reverse) {
+    if (trav_on_start(&game_manager->turn_log))
+      return;
+    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
+    next_turn = trav_prev_move(turn_log);
+  } else {
+    if (trav_on_end(&game_manager->turn_log))
+      return;
+    next_turn = trav_next_move(turn_log);
+    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
+  }
+
+  if (next_turn) {
+    apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
+  }
+}
+
+void trav_apply_to_start(GameManager *game_manager) {
+  trav_goto_start(&game_manager->turn_log);
+
+  game_manager->board = default_board();
+  apply_turn_entry(turn_at(&game_manager->turn_log, 0), game_manager);
+
+  if (game_manager->dice_roll.v1 < game_manager->dice_roll.v2) {
+    game_manager->curr_player = Red;
+  } else {
+    game_manager->curr_player = White;
+  }
+}
+
+void trav_apply_to_end(GameManager *game_manager, GameManager *end_game) {
+  *game_manager = *end_game;
+  trav_goto_end(&game_manager->turn_log);
 }
 
 // returns whether move was legal
@@ -1078,7 +1183,8 @@ void display_play_menu(WinManager *win_manager) {
   refresh_win(&win_manager->content_win);
 }
 
-bool play_load_game(WinManager *win_manager) {
+bool load_game(WinManager *win_manager, GameManager *game_manager) {
+
   enable_cursor();
   clear_win(&win_manager->io_win);
 
@@ -1086,12 +1192,17 @@ bool play_load_game(WinManager *win_manager) {
   prompt_input(&win_manager->io_win, "Load from file: ", filename);
 
   disable_cursor();
-  GameManager game_manager;
-  if (!deserialize_game(win_manager, &game_manager, filename)) {
+  if (!deserialize_game(win_manager, game_manager, filename)) {
     refresh_win(&win_manager->io_win);
     return false;
   }
+  return true;
+}
 
+bool play_load_game(WinManager *win_manager) {
+  GameManager game_manager;
+
+  load_game(win_manager, &game_manager);
   game_loop(win_manager, &game_manager);
 
   return true;
@@ -1105,6 +1216,37 @@ bool play_new_game(WinManager *win_manager) {
   game_loop(win_manager, &game_manager);
 
   return true;
+}
+
+void watch_menu_loop(WinManager *win_manager) {
+  clear_refresh_win(&win_manager->io_win);
+  GameManager game_manager, end_game;
+  if (!load_game(win_manager, &game_manager)) {
+    return;
+  }
+  end_game = game_manager;
+  trav_apply_to_start(&game_manager);
+  while (true) {
+    display_game(win_manager, &game_manager);
+    switch (char_input()) {
+    case 'j':
+    case 'p':
+      trav_apply_move(&game_manager, true);
+      break;
+    case 'k':
+    case 'n':
+      trav_apply_move(&game_manager, false);
+      break;
+    case 'a':
+      trav_apply_to_start(&game_manager);
+      break;
+    case 'z':
+      trav_apply_to_end(&game_manager, &end_game);
+      break;
+    case 'q':
+      return;
+    }
+  }
 }
 
 void play_menu_loop(WinManager *win_manager) {
