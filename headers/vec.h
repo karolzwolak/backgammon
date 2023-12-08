@@ -2,7 +2,7 @@
 
 #include <stdlib.h>
 
-#define DEFAULT_CAP 10
+#define DEFAULT_CAP 8
 #define GROWTH_FACTOR 2
 #define NO_HEAP_MEM_EXIT 2
 

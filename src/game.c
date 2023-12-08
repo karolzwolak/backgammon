@@ -270,7 +270,7 @@ void new_turn_log(TurnLog *turn_log_out, int cap) {
 }
 
 void push_to_turn_log(TurnLog *turn_log, TurnEntry *turn_entry) {
-  if (turn_log->vec.len + 1 >= turn_log->vec.cap) {
+  if (turn_log->vec.len + 1 > turn_log->vec.cap) {
     if (vec_extend(&turn_log->vec) == 1) {
       exit(NO_HEAP_MEM_EXIT);
       return;
