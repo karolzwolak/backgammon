@@ -939,17 +939,20 @@ bool player_enter(GameManager *game_manager, int move_by) {
   return true;
 }
 
+int bar_count(Board *board, CheckerKind checker_kind) {
+  if (checker_kind == White)
+    return board->white_bar.checker_count;
+  if (checker_kind == Red)
+    return board->red_bar.checker_count;
+  return -1;
+}
+
 int legal_enters_count(GameManager *game_manager) {
   if (game_manager->curr_player == None)
     return 0;
 
-  int checker_count;
-  if (game_manager->curr_player == White)
-    checker_count = game_manager->board.white_bar.checker_count;
-  else
-    checker_count = game_manager->board.red_bar.checker_count;
-  if (checker_count == 0)
-    return 0;
+  int checker_count =
+      bar_count(&game_manager->board, game_manager->curr_player);
 
   int count = 0;
   int v1 = game_manager->dice_roll.v1;
@@ -970,7 +973,8 @@ int legal_enters_count(GameManager *game_manager) {
 
 bool any_move_legal(GameManager *game_manager) {
   if (game_manager->curr_player == None ||
-      dice_roll_used(&game_manager->dice_roll))
+      dice_roll_used(&game_manager->dice_roll) ||
+      bar_count(&game_manager->board, game_manager->curr_player) > 0)
     return false;
 
   int v1 = game_manager->dice_roll.v1;
