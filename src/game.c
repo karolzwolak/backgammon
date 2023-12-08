@@ -266,7 +266,7 @@ void new_turn_log(TurnLog *turn_log_out, int cap) {
   if (vec.data == NULL) {
     exit(NO_HEAP_MEM_EXIT);
   }
-  *turn_log_out = (TurnLog){vec, 0, 0};
+  *turn_log_out = (TurnLog){vec, 0, -1};
 }
 
 void push_to_turn_log(TurnLog *turn_log, TurnEntry *turn_entry) {
@@ -301,7 +301,11 @@ bool trav_on_end(TurnLog *turn_log) {
 }
 
 bool trav_on_start(TurnLog *turn_log) {
-  return turn_log->trav_turn_id <= 0 && turn_log->trav_move_id <= 0;
+  return turn_log->trav_turn_id == 0 && turn_log->trav_move_id <= -1;
+}
+
+bool trav_on_first(TurnLog *turn_log) {
+  return turn_log->trav_turn_id == 0 && turn_log->trav_move_id == 0;
 }
 
 bool trav_next_move(TurnLog *turn_log) {
@@ -325,7 +329,7 @@ bool trav_prev_move(TurnLog *turn_log) {
     return false;
 
   turn_log->trav_move_id--;
-  bool new_turn = turn_log->trav_move_id == -1;
+  bool new_turn = turn_log->trav_move_id == -1 && !trav_on_start(turn_log);
 
   if (new_turn) {
     turn_log->trav_turn_id--;
@@ -344,14 +348,15 @@ MoveEntry *trav_curr_move(TurnLog *turn_log) {
 void trav_goto_end(TurnLog *turn_log) {
   if (turn_log->vec.len > 0)
     turn_log->trav_turn_id = turn_log->vec.len - 1;
-  // move next move id past the last move
   turn_log->trav_move_id =
       turn_at(turn_log, turn_log->trav_turn_id)->move_count;
+  if (turn_log->trav_move_id >= 0)
+    turn_log->trav_move_id--;
 }
 
 void trav_goto_start(TurnLog *turn_log) {
   turn_log->trav_turn_id = 0;
-  turn_log->trav_move_id = 0;
+  turn_log->trav_move_id = -1;
 }
 
 void serialize_turn_log(TurnLog *turn_log, FILE *fp) {
@@ -878,19 +883,19 @@ void trav_apply_move(GameManager *game_manager, bool reverse) {
   if (reverse) {
     if (trav_on_start(&game_manager->turn_log))
       return;
+    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
     new_turn = trav_prev_move(turn_log);
     if (new_turn) {
       apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
     }
-    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
   } else {
     if (trav_on_end(&game_manager->turn_log))
       return;
-    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
     new_turn = trav_next_move(turn_log);
     if (new_turn) {
       apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
     }
+    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
   }
 }
 
