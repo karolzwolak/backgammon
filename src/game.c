@@ -13,13 +13,17 @@
 #define TURN_LOG_HEADER "HISTORY"
 
 #define MAX_DOUBLET_USES 4
-#define BAR_POS -1
 
 #define WHITE_HOME_START 5
 #define RED_HOME_START BOARD_SIZE - 5
 
 #define WHITE_OUT_START -1
 #define RED_OUT_START BOARD_SIZE
+
+#define WHITE_BAR_POS -7
+#define RED_BAR_POS -8
+#define PLAYER_BAR_POS(player) player == White ? WHITE_BAR_POS : RED_BAR_POS
+#define ENEMY_BAR_POS(player) player == White ? RED_BAR_POS : WHITE_BAR_POS
 
 #define WHITE_DIR -1
 #define RED_DIR 1
@@ -729,7 +733,34 @@ bool can_player_move_to_point(GameManager *game_manager, int dest) {
          game_manager->board.board_points[dest].checker_count <= 1;
 }
 
+bool is_pos_out(int pos) {
+  return (pos > WHITE_BAR_POS && pos <= WHITE_OUT_START) ||
+         pos >= RED_OUT_START;
+}
+
+CheckerKind checker_kind_at(Board *board, int pos) {
+  if (pos == RED_BAR_POS || pos >= RED_OUT_START)
+    return Red;
+  if (pos == WHITE_BAR_POS || pos <= WHITE_OUT_START)
+    return White;
+  return board->board_points[pos].checker_kind;
+}
+
+int enter_dest(CheckerKind checker_kind, int move_by) {
+  if (checker_kind == White) {
+    return RED_OUT_START - move_by;
+  } else if (checker_kind == Red) {
+    return WHITE_OUT_START + move_by;
+  }
+  return -1;
+}
+
 int move_dest(GameManager *game_manager, int from, int move_by) {
+  if (from == WHITE_BAR_POS) {
+    return enter_dest(White, move_by);
+  } else if (from == RED_BAR_POS) {
+    return enter_dest(Red, move_by);
+  }
   int dest = from;
 
   if (game_manager->curr_player == White) {
@@ -743,6 +774,8 @@ int move_dest(GameManager *game_manager, int from, int move_by) {
 // just check if moving checker is legal, doesnt check for checkers on bar,
 // and whether player has dice enough to play that move
 bool is_move_legal(GameManager *game_manager, int from, int move_by) {
+  if (from < 0)
+    return false;
   Board *board = &game_manager->board;
   int dest = move_dest(game_manager, from, move_by);
   if (from == dest || game_manager->curr_player == None ||
@@ -759,15 +792,6 @@ bool is_move_legal(GameManager *game_manager, int from, int move_by) {
   return can_player_move_to_point(game_manager, dest);
 }
 
-int enter_dest(CheckerKind checker_kind, int move_by) {
-  if (checker_kind == White) {
-    return RED_OUT_START - move_by;
-  } else if (checker_kind == Red) {
-    return WHITE_OUT_START + move_by;
-  }
-  return -1;
-}
-
 bool is_enter_legal(GameManager *game_manager, int move_by) {
   if (game_manager->curr_player == None || move_by > QUARTER_BOARD ||
       move_by <= 0)
@@ -777,34 +801,30 @@ bool is_enter_legal(GameManager *game_manager, int move_by) {
   return can_player_move_to_point(game_manager, pos);
 }
 
-bool is_pos_out(int pos) {
-  return pos <= WHITE_OUT_START || pos >= RED_OUT_START;
-}
-
 void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
   Board *board = &game_manager->board;
-  CheckerKind curr_player = game_manager->curr_player;
 
   if (reverse) {
     int temp = from;
     from = dest;
     dest = temp;
   }
+  CheckerKind checker_kind = checker_kind_at(board, from);
 
-  if (from == BAR_POS) {
-    add_to_bar(board, curr_player, -1);
+  if (from == WHITE_BAR_POS || from == RED_BAR_POS) {
+    add_to_bar(board, checker_kind, -1);
   } else if (is_pos_out(from)) {
-    add_to_out(board, curr_player, -1);
+    add_to_out(board, checker_kind, -1);
   } else {
-    add_to_point(board, from, curr_player, -1);
+    add_to_point(board, from, checker_kind, -1);
   }
 
-  if (dest == BAR_POS) {
-    add_to_bar(board, curr_player, 1);
+  if (dest == WHITE_BAR_POS || dest == RED_BAR_POS) {
+    add_to_bar(board, checker_kind, 1);
   } else if (is_pos_out(dest)) {
-    add_to_out(board, curr_player, 1);
+    add_to_out(board, checker_kind, 1);
   } else {
-    add_to_point(board, dest, curr_player, 1);
+    add_to_point(board, dest, checker_kind, 1);
   }
 }
 
@@ -813,18 +833,17 @@ bool move_checker_check_hit(GameManager *game_manager, int from, int move_by) {
   int dest = move_dest(game_manager, from, move_by);
   CheckerKind curr_player = game_manager->curr_player;
 
+  bool hit = false;
   if (!is_pos_out(dest) &&
       board->board_points[dest].checker_kind != game_manager->curr_player &&
       board->board_points[dest].checker_count > 0) {
-    CheckerKind enemy = opposite_checker(curr_player);
-    add_to_bar(board, enemy, 1);
-    add_to_point(board, dest, enemy, -1);
-
-    return true;
+    move_checker(game_manager, dest, ENEMY_BAR_POS(game_manager->curr_player),
+                 false);
+    hit = true;
   }
   move_checker(game_manager, from, dest, false);
 
-  return false;
+  return hit;
 }
 
 void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
@@ -840,9 +859,8 @@ void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
     move_checker(game_manager, from, dest, reverse);
 
   if (move_entry->hit_enemy) {
-    game_manager->curr_player = opposite_checker(game_manager->curr_player);
-    move_checker(game_manager, dest, BAR_POS, reverse);
-    game_manager->curr_player = opposite_checker(game_manager->curr_player);
+    move_checker(game_manager, dest, ENEMY_BAR_POS(game_manager->curr_player),
+                 reverse);
   }
 
   if (!reverse)
@@ -909,8 +927,9 @@ bool player_enter(GameManager *game_manager, int move_by) {
   if (!is_enter_legal(game_manager, move_by))
     return false;
 
-  int hit_enemy = move_checker_check_hit(game_manager, BAR_POS, move_by);
-  game_add_move_entry(game_manager, BAR_POS, move_by, hit_enemy);
+  int from = PLAYER_BAR_POS(game_manager->curr_player);
+  int hit_enemy = move_checker_check_hit(game_manager, from, move_by);
+  game_add_move_entry(game_manager, from, move_by, hit_enemy);
 
   return true;
 }
