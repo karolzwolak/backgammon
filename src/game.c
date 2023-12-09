@@ -174,7 +174,7 @@ void get_yx_for_print_point(int id, int *y, int *x_out, int *move_by_out) {
 }
 
 void print_point_checkers(WinWrapper *win_wrapper, BoardPoint *board_point,
-                          int y, int x, int move_by) {
+                          int *y, int x, int move_by) {
 
   char out = checker_char(board_point->checker_kind);
   int draw_count = board_point->checker_count;
@@ -182,8 +182,8 @@ void print_point_checkers(WinWrapper *win_wrapper, BoardPoint *board_point,
     draw_count = BOARD_ROW_COUNT - 1;
 
   for (int i = 0; i < draw_count; i++) {
-    mv_printf_yx(win_wrapper, y, x, "%c", out);
-    y += move_by;
+    mv_printf_yx(win_wrapper, *y, x, "%c", out);
+    *y += move_by;
   }
 }
 
@@ -196,7 +196,7 @@ void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
   int x, y, move_by;
   get_yx_for_print_point(id, &y, &x, &move_by);
 
-  print_point_checkers(win_wrapper, board_point, y, x, move_by);
+  print_point_checkers(win_wrapper, board_point, &y, x, move_by);
 
   if (x > BOARD_WIDTH / 2)
     x -= 1;
@@ -213,9 +213,9 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
   int start_y, move_dir = CHECKER_DIR(board_point->checker_kind);
 
   if (board_point->checker_kind == White) {
-    start_y = CONTENT_Y_START;
+    start_y = CONTENT_Y_START + 1;
   } else {
-    start_y = CONTENT_Y_END;
+    start_y = CONTENT_Y_END - 1;
   }
 
   for (int i = 0; i < board_point->checker_count; i++) {
@@ -572,7 +572,6 @@ void serialize_player_roll(GameManager *game_manager, FILE *fp) {
   fprintf(fp, "player %c\n", checker_char(game_manager->curr_player));
   fprintf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", dice_roll->v1, dice_roll->v2,
           dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
-  fprintf(fp, "\n");
 }
 
 bool serialize_game(GameManager *game_manager, char *filename) {
@@ -586,6 +585,8 @@ bool serialize_game(GameManager *game_manager, char *filename) {
 
   if (!serialize_board(board, fp))
     return false;
+
+  serialize_player_roll(game_manager, fp);
 
   serialize_turn_log(&game_manager->turn_log, fp);
 
@@ -632,14 +633,6 @@ bool scan_board_points(Board *board, FILE *fp, int *white_count,
   return true;
 }
 
-void assign_bar(Board *board, CheckerKind checker_kind, int count) {
-  board->white_bar.checker_kind = checker_kind;
-  if (checker_kind == White)
-    board->white_bar.checker_count = count;
-  else
-    board->red_bar.checker_count = count;
-}
-
 bool scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
   int checker_count;
   char checker_char;
@@ -649,15 +642,16 @@ bool scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
   if (checker_char != WHITE_CHECKER_CHAR)
     return false;
 
-  assign_bar(board, White, checker_count);
+  board->white_bar.checker_count = checker_count;
   *white_count += checker_count;
 
   if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
     return false;
   if (checker_char != RED_CHECKER_CHAR)
     return false;
-  assign_bar(board, Red, checker_count);
-  red_count += checker_count;
+
+  board->red_bar.checker_count = checker_count;
+  *red_count += checker_count;
 
   return true;
 }
@@ -782,8 +776,8 @@ int checker_move_by(CheckerKind checker_kind, int from, int by) {
 }
 
 int enter_dest(CheckerKind checker_kind, int move_by) {
-  return out_start(opposite_checker(checker_kind)) +
-         move_by * CHECKER_DIR(checker_kind);
+  return checker_move_by(checker_kind,
+                         out_start(opposite_checker(checker_kind)), move_by);
 }
 
 int move_dest(GameManager *game_manager, int from, int move_by) {
@@ -843,8 +837,7 @@ bool is_move_legal(GameManager *game_manager, int from, int move_by) {
 }
 
 bool is_enter_legal(GameManager *game_manager, int move_by) {
-  if (game_manager->curr_player == None || move_by > QUARTER_BOARD ||
-      move_by <= 0)
+  if (game_manager->curr_player == None || move_by <= 0)
     return false;
 
   int pos = enter_dest(game_manager->curr_player, move_by);
@@ -1027,7 +1020,7 @@ int legal_enters_count(GameManager *game_manager) {
   int v2 = game_manager->dice_roll.v2;
   if (v1 == v2) {
     if (is_enter_legal(game_manager, v1))
-      count += MAX_DOUBLET_USES;
+      count = MAX_DOUBLET_USES;
   } else {
     if (is_enter_legal(game_manager, v1))
       count++;
@@ -1108,8 +1101,8 @@ void print_stats_roll(WinWrapper *win_wrapper, GameManager *game_manager, int y,
 
   mv_printf_yx(win_wrapper, y, x, " roll", v1);
   if (v1 == v2) {
-    for (int i = 0; i < MAX_DOUBLET_USES; i++)
-      win_printf(win_wrapper, " %d", i < d_times);
+    for (int i = MAX_DOUBLET_USES; i > 0; i--)
+      print_dice_val(win_wrapper, v1, d_times > i);
   } else {
     print_dice_val(win_wrapper, v1, game_manager->dice_roll.used1);
     print_dice_val(win_wrapper, v2, game_manager->dice_roll.used2);
@@ -1233,7 +1226,8 @@ bool play_turn(WinManager *win_manager, GameManager *game_manager,
     log_new_turn(game_manager);
   }
 
-  for (int i = 0; i < legal_enters_count(game_manager); i++) {
+  int count = legal_enters_count(game_manager);
+  for (int i = 0; i < count; i++) {
     if (make_enter_move_loop(win_manager, game_manager))
       return true;
 
