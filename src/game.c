@@ -949,6 +949,12 @@ void trav_apply_to_end(GameManager *game_manager, GameManager *end_game) {
   trav_goto_end(&game_manager->turn_log);
 }
 
+void trav_delete_next_moves(TurnLog *turn_log) {
+  turn_log->vec.len = turn_log->trav_turn_id + 1;
+  TurnEntry *curr_turn = turn_at(turn_log, turn_log->trav_turn_id);
+  curr_turn->move_count = turn_log->trav_move_id + 1;
+}
+
 // returns whether move was legal
 bool player_move(GameManager *game_manager, int from, int move_by) {
   if (!is_move_legal(game_manager, from, move_by))
@@ -1183,10 +1189,13 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
   return false;
 }
 
-bool play_turn(WinManager *win_manager, GameManager *game_manager) {
-  TurnEntry turn_entry;
-  turn_entry_new(&turn_entry, &game_manager->dice_roll);
-  push_to_turn_log(&game_manager->turn_log, &turn_entry);
+bool play_turn(WinManager *win_manager, GameManager *game_manager,
+               bool resume) {
+  if (!resume) {
+    TurnEntry turn_entry;
+    turn_entry_new(&turn_entry, &game_manager->dice_roll);
+    push_to_turn_log(&game_manager->turn_log, &turn_entry);
+  }
 
   int enter_moves_count = legal_enters_count(game_manager);
   for (int i = 0; i < enter_moves_count; i++) {
@@ -1216,15 +1225,17 @@ CheckerKind check_game_over(GameManager *game_manager) {
     return Red;
   return None;
 }
-void game_loop(WinManager *win_manager, GameManager *game_manager) {
+void game_loop(WinManager *win_manager, GameManager *game_manager,
+               bool resume) {
   enable_cursor();
   clear_refresh_win(&win_manager->io_win);
 
   while (true) {
     display_game(win_manager, game_manager);
-    if (play_turn(win_manager, game_manager)) {
+    if (play_turn(win_manager, game_manager, resume)) {
       break;
     }
+    resume = false;
     CheckerKind won = check_game_over(game_manager);
     if (won != None) {
       clear_refresh_win(&win_manager->content_win);
@@ -1280,7 +1291,7 @@ bool play_load_game(WinManager *win_manager) {
   GameManager game_manager;
 
   load_game(win_manager, &game_manager);
-  game_loop(win_manager, &game_manager);
+  game_loop(win_manager, &game_manager, true);
 
   return true;
 }
@@ -1290,9 +1301,15 @@ bool play_new_game(WinManager *win_manager) {
 
   GameManager game_manager;
   game_manager = new_game_manager("white", "red");
-  game_loop(win_manager, &game_manager);
+  game_loop(win_manager, &game_manager, false);
 
   return true;
+}
+
+void resume_game_from_watch(WinManager *win_manager,
+                            GameManager *game_manager) {
+  trav_delete_next_moves(&game_manager->turn_log);
+  game_loop(win_manager, game_manager, true);
 }
 
 void watch_menu_loop(WinManager *win_manager) {
@@ -1321,7 +1338,7 @@ void watch_menu_loop(WinManager *win_manager) {
       trav_apply_to_end(&game_manager, &end_game);
       break;
     case 'r':
-      game_loop(win_manager, &game_manager);
+      resume_game_from_watch(win_manager, &game_manager);
       return;
 
     case 'q':
