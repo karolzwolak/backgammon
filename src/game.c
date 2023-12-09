@@ -853,7 +853,6 @@ void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
 bool move_checker_check_hit(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
   int dest = move_dest(game_manager, from, move_by);
-  CheckerKind curr_player = game_manager->curr_player;
 
   bool hit = false;
   if (!is_pos_out(dest) &&
@@ -870,9 +869,6 @@ bool move_checker_check_hit(GameManager *game_manager, int from, int move_by) {
 
 void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
                       bool reverse) {
-  Board *board = &game_manager->board;
-  int d_count = reverse ? -1 : 1;
-
   int from = move_entry->from;
   int by = move_entry->by;
   int dest = move_dest(game_manager, from, by);
