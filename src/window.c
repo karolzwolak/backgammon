@@ -67,8 +67,7 @@ void mv_printf_centered(WinWrapper *win_wrapper, int y, const char *fmt, ...) {
   va_end(args);
 }
 
-void printf_centered_on_new_line(WinWrapper *win_wrapper, const char *fmt,
-                                 ...) {
+void printf_centered_nl(WinWrapper *win_wrapper, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   int y = getcury(win_wrapper->win) + 1;
@@ -115,7 +114,7 @@ bool check_for_quit_input(char *input) {
 }
 
 void prompt_input(WinWrapper *io_wrapper, const char *prompt, char *res) {
-  printf_centered_on_new_line(io_wrapper, prompt);
+  printf_centered_nl(io_wrapper, prompt);
   wscanw(io_wrapper->win, "%" STR(MAX_INPUT_LEN) "s", res);
   move_rel(io_wrapper, -1, 0);
 }

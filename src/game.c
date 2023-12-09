@@ -38,9 +38,11 @@
 #define STATS_GAP 3
 #define STATS_TOP_BOT_MARGIN                                                   \
   (SIDE_WIN_HEIGHT - STATS_GAP - 2 * STATS_LINES_COUNT) / 2
-#define STATS_WHITE_Y_START STATS_TOP_BOT_MARGIN
-#define STATS_RED_Y_START                                                      \
-  SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
+#define STATS_WHITE_Y STATS_TOP_BOT_MARGIN
+#define STATS_RED_Y SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
+
+#define STATS_ROLL_X 4
+#define STATS_ROLL_DOUBLET_X 1
 
 #define WHITE_CHECKER_CHAR 'W'
 #define RED_CHECKER_CHAR 'R'
@@ -147,41 +149,51 @@ void print_overflowing_checkers(WinWrapper *win_wrapper,
                board_point->checker_count - BOARD_ROW_COUNT);
 }
 
+void get_yx_for_print_point(int id, int *y, int *x_out, int *move_by_out) {
+  bool on_bottom = id >= HALF_BOARD;
+
+  if (on_bottom) {
+    id = id % 12;
+    *y = CONTENT_Y_END - 1;
+    *x_out = CONTENT_X_START + id * BOARD_POINT_WIDTH;
+    *move_by_out = -1;
+
+    if (id >= QUARTER_BOARD)
+      *x_out += BAR_HORIZONTAL_GAP;
+  } else {
+    *y = CONTENT_Y_START + 1;
+    *x_out = CONTENT_X_END - id * BOARD_POINT_WIDTH;
+    *move_by_out = 1;
+
+    if (id >= QUARTER_BOARD)
+      *x_out -= BAR_HORIZONTAL_GAP;
+  }
+}
+
+void print_point_checkers(WinWrapper *win_wrapper, BoardPoint *board_point,
+                          int y, int x, int move_by) {
+
+  char out = checker_char(board_point->checker_kind);
+  int draw_count = board_point->checker_count;
+  if (draw_count > BOARD_ROW_COUNT)
+    draw_count = BOARD_ROW_COUNT - 1;
+
+  for (int i = 0; i < draw_count; i++) {
+    mv_printf_yx(win_wrapper, y, x, "%c", out);
+    y += move_by;
+  }
+}
+
 void print_board_point(WinWrapper *win_wrapper, BoardPoint *board_point,
                        int id) {
 
   if (board_point->checker_count == 0 || board_point->checker_kind == None)
     return;
 
-  char out = checker_char(board_point->checker_kind);
+  int x, y, move_by;
+  get_yx_for_print_point(id, &y, &x, &move_by);
 
-  bool on_bottom = id >= HALF_BOARD;
-  int y, x, move_by;
-
-  if (on_bottom) {
-    id = id % 12;
-    y = CONTENT_Y_END - 1;
-    x = CONTENT_X_START + id * BOARD_POINT_WIDTH;
-    move_by = -1;
-
-    if (id >= QUARTER_BOARD)
-      x += BAR_HORIZONTAL_GAP;
-  } else {
-    y = CONTENT_Y_START + 1;
-    x = CONTENT_X_END - id * BOARD_POINT_WIDTH;
-    move_by = 1;
-
-    if (id >= QUARTER_BOARD)
-      x -= BAR_HORIZONTAL_GAP;
-  }
-
-  int draw_count = board_point->checker_count;
-  if (draw_count > BOARD_ROW_COUNT)
-    draw_count = BOARD_ROW_COUNT - 1;
-  for (int i = 0; i < draw_count; i++) {
-    mv_printf_yx(win_wrapper, y, x, "%c", out);
-    y += move_by;
-  }
+  print_point_checkers(win_wrapper, board_point, y, x, move_by);
 
   if (x > BOARD_WIDTH / 2)
     x -= 1;
@@ -602,6 +614,14 @@ bool scan_board_points(Board *board, FILE *fp, int *white_count,
   return true;
 }
 
+void assign_bar(Board *board, CheckerKind checker_kind, int count) {
+  board->white_bar.checker_kind = checker_kind;
+  if (checker_kind == White)
+    board->white_bar.checker_count = count;
+  else
+    board->red_bar.checker_count = count;
+}
+
 bool scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
   int checker_count;
   char checker_char;
@@ -610,17 +630,16 @@ bool scan_board_bar(Board *board, FILE *fp, int *white_count, int *red_count) {
     return false;
   if (checker_char != WHITE_CHECKER_CHAR)
     return false;
-  board->white_bar.checker_count = checker_count;
-  board->white_bar.checker_kind = White;
+
+  assign_bar(board, White, checker_count);
   *white_count += checker_count;
 
   if (fscanf(fp, "bar %c %d\n", &checker_char, &checker_count) < 2)
     return false;
   if (checker_char != RED_CHECKER_CHAR)
     return false;
-  board->red_bar.checker_count = checker_count;
-  board->red_bar.checker_kind = Red;
-  *red_count += checker_count;
+  assign_bar(board, Red, checker_count);
+  red_count += checker_count;
 
   return true;
 }
@@ -661,11 +680,8 @@ bool scan_player_roll(GameManager *game_manager, FILE *fp) {
   if (scanned < 5)
     return false;
 
-  game_manager->dice_roll.v1 = v1;
-  game_manager->dice_roll.v2 = v2;
-  game_manager->dice_roll.used1 = used1;
-  game_manager->dice_roll.used2 = used2;
-  game_manager->dice_roll.doublet_times_used = doublet_times_used;
+  game_manager->dice_roll =
+      (DiceRoll){v1, v2, used1, used2, doublet_times_used};
 
   return true;
 }
@@ -699,8 +715,8 @@ bool deserialize_game(WinManager *win_manager, GameManager *out_game,
   FILE *fp = fopen(filename, "r");
   refresh_win(&win_manager->io_win);
   if (fp == NULL) {
-    printf_centered_on_new_line(&win_manager->io_win, "Cannot access file '%s'",
-                                filename);
+    printf_centered_nl(&win_manager->io_win, "Cannot access file '%s'",
+                       filename);
     return false;
   }
 
@@ -711,8 +727,8 @@ bool deserialize_game(WinManager *win_manager, GameManager *out_game,
   fclose(fp);
 
   if (!success) {
-    printf_centered_on_new_line(&win_manager->io_win, "Wrong data in file '%s'",
-                                filename);
+    printf_centered_nl(&win_manager->io_win, "Wrong data in file '%s'",
+                       filename);
   }
 
   return success;
@@ -760,6 +776,10 @@ bool is_pos_out(int pos) {
          pos >= RED_OUT_START;
 }
 
+bool is_pos_on_bar(int pos) {
+  return pos == WHITE_BAR_POS || pos == RED_BAR_POS;
+}
+
 CheckerKind checker_kind_at(Board *board, int pos) {
   if (pos == RED_BAR_POS || pos >= RED_OUT_START)
     return Red;
@@ -793,19 +813,16 @@ int move_dest(GameManager *game_manager, int from, int move_by) {
   return dest;
 }
 
-// just check if moving checker is legal, doesnt check for checkers on bar,
-// and whether player has dice enough to play that move
+// check if move from point is legal
 bool is_move_legal(GameManager *game_manager, int from, int move_by) {
-  if (from < 0)
-    return false;
   Board *board = &game_manager->board;
   int dest = move_dest(game_manager, from, move_by);
-  if (from == dest || game_manager->curr_player == None ||
-      board->board_points[from].checker_count == 0 ||
-      board->board_points[from].checker_kind != game_manager->curr_player)
+
+  if (from < 0 || !can_use_roll_val(&game_manager->dice_roll, move_by) ||
+      checker_kind_at(board, from) != game_manager->curr_player)
     return false;
 
-  if (dest <= WHITE_OUT_START || dest >= RED_OUT_START) {
+  if (is_pos_out(dest)) {
     if ((dest <= WHITE_OUT_START && game_manager->curr_player != White) ||
         (dest >= RED_OUT_START && game_manager->curr_player != Red))
       return false;
@@ -833,7 +850,7 @@ void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
   }
   CheckerKind checker_kind = checker_kind_at(board, from);
 
-  if (from == WHITE_BAR_POS || from == RED_BAR_POS) {
+  if (is_pos_on_bar(from)) {
     add_to_bar(board, checker_kind, -1);
   } else if (is_pos_out(from)) {
     add_to_out(board, checker_kind, -1);
@@ -841,7 +858,7 @@ void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
     add_to_point(board, from, checker_kind, -1);
   }
 
-  if (dest == WHITE_BAR_POS || dest == RED_BAR_POS) {
+  if (is_pos_on_bar(dest)) {
     add_to_bar(board, checker_kind, 1);
   } else if (is_pos_out(dest)) {
     add_to_out(board, checker_kind, 1);
@@ -900,31 +917,37 @@ void apply_turn_entry(TurnEntry *turn_entry, GameManager *game_manager) {
   game_manager->dice_roll = new_dice_roll(turn_entry->dice1, turn_entry->dice2);
 }
 
+void trav_apply_reverse_move(GameManager *game_manager, TurnLog *turn_log) {
+  if (trav_on_start(&game_manager->turn_log))
+    return;
+  if (!trav_on_new_turn(turn_log)) {
+    apply_move_entry(trav_curr_move(turn_log), game_manager, true);
+    trav_prev_move(turn_log);
+    return;
+  }
+  trav_prev_move(turn_log);
+  TurnEntry *prev_turn = turn_at(turn_log, turn_log->trav_turn_id);
+  apply_turn_entry(prev_turn, game_manager);
+  synch_prev_turn_dice(prev_turn, game_manager);
+}
+
+void trav_apply_next_move(GameManager *game_manager, TurnLog *turn_log) {
+  if (trav_on_end(&game_manager->turn_log))
+    return;
+  bool new_turn = trav_next_move(turn_log);
+  if (new_turn) {
+    apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
+    return;
+  }
+  apply_move_entry(trav_curr_move(turn_log), game_manager, false);
+}
+
 void trav_apply_move(GameManager *game_manager, bool reverse) {
   TurnLog *turn_log = &game_manager->turn_log;
-  bool new_turn;
-  if (reverse) {
-    if (trav_on_start(&game_manager->turn_log))
-      return;
-    if (!trav_on_new_turn(turn_log)) {
-      apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
-      trav_prev_move(turn_log);
-      return;
-    }
-    trav_prev_move(turn_log);
-    TurnEntry *prev_turn = turn_at(turn_log, turn_log->trav_turn_id);
-    apply_turn_entry(prev_turn, game_manager);
-    synch_prev_turn_dice(prev_turn, game_manager);
-  } else {
-    if (trav_on_end(&game_manager->turn_log))
-      return;
-    new_turn = trav_next_move(turn_log);
-    if (new_turn) {
-      apply_turn_entry(turn_at(turn_log, turn_log->trav_turn_id), game_manager);
-      return;
-    }
-    apply_move_entry(trav_curr_move(turn_log), game_manager, reverse);
-  }
+  if (reverse)
+    trav_apply_reverse_move(game_manager, turn_log);
+  else
+    trav_apply_next_move(game_manager, turn_log);
 }
 
 void trav_apply_to_start(GameManager *game_manager) {
@@ -1006,27 +1029,21 @@ int legal_enters_count(GameManager *game_manager) {
 }
 
 bool any_move_legal(GameManager *game_manager) {
-  if (game_manager->curr_player == None ||
-      dice_roll_used(&game_manager->dice_roll) ||
-      bar_count(&game_manager->board, game_manager->curr_player) > 0)
+  DiceRoll *dice_roll = &game_manager->dice_roll;
+  CheckerKind curr_player = game_manager->curr_player;
+  if (curr_player == None || dice_roll_used(dice_roll) ||
+      bar_count(&game_manager->board, curr_player) > 0)
     return false;
 
-  int v1 = game_manager->dice_roll.v1;
-  int v2 = game_manager->dice_roll.v2;
-  bool v1_used = game_manager->dice_roll.used1;
-  bool v2_used = game_manager->dice_roll.used2;
+  int v1 = dice_roll->v1;
+  int v2 = dice_roll->v2;
 
-  if (v1 == v2) {
-    v1_used = game_manager->dice_roll.doublet_times_used >= MAX_DOUBLET_USES;
-    v2_used = true;
-  }
   for (int i = 0; i < BOARD_SIZE; i++) {
-    if (game_manager->board.board_points[i].checker_kind !=
-        game_manager->curr_player)
+    if (checker_kind_at(&game_manager->board, i) != curr_player)
       continue;
-    if (!v1_used && is_move_legal(game_manager, i, v1))
+    if (is_move_legal(game_manager, i, v1))
       return true;
-    if (!v2_used && is_move_legal(game_manager, i, v2))
+    if (v1 != v2 && is_move_legal(game_manager, i, v2))
       return true;
   }
   return false;
@@ -1065,45 +1082,54 @@ void display_board(WinWrapper *win_wrapper, Board *board) {
   refresh_win(win_wrapper);
 }
 
-void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
-  mv_printf_centered(win_wrapper, STATS_WHITE_Y_START, "-> White");
-  printf_centered_on_new_line(win_wrapper, "out: %02d",
-                              game_manager->board.white_out_count);
-
-  mv_printf_centered(win_wrapper, STATS_RED_Y_START, "-> Red");
-  printf_centered_on_new_line(win_wrapper, "out: %02d",
-                              game_manager->board.red_out_count);
-  int y = 2;
-  if (game_manager->curr_player == White)
-    y += STATS_WHITE_Y_START;
+void print_dice_val(WinWrapper *win_wrapper, int v, bool used) {
+  if (!used)
+    win_printf(win_wrapper, " %d", v);
   else
-    y += STATS_RED_Y_START;
+    win_printf(win_wrapper, " _");
+}
+
+void print_stats_roll(WinWrapper *win_wrapper, GameManager *game_manager, int y,
+                      int x) {
   int v1 = game_manager->dice_roll.v1;
   int v2 = game_manager->dice_roll.v2;
-
-  int x = 4;
-
-  if (game_manager->dice_roll.v1 == game_manager->dice_roll.v2) {
-    x = 1;
-  }
+  int d_times = game_manager->dice_roll.doublet_times_used;
 
   mv_printf_yx(win_wrapper, y, x, " roll", v1);
   if (v1 == v2) {
-    for (int i = game_manager->dice_roll.doublet_times_used;
-         i < MAX_DOUBLET_USES; i++)
-      win_printf(win_wrapper, " %d", v1);
-    for (int i = 0; i < game_manager->dice_roll.doublet_times_used; i++)
-      win_printf(win_wrapper, " _");
+    for (int i = 0; i < MAX_DOUBLET_USES; i++)
+      win_printf(win_wrapper, " %d", i < d_times);
   } else {
-    if (!game_manager->dice_roll.used1)
-      win_printf(win_wrapper, " %d", v1);
-    else
-      win_printf(win_wrapper, " _");
-    if (!game_manager->dice_roll.used2)
-      win_printf(win_wrapper, " %d", v2);
-    else
-      win_printf(win_wrapper, " _");
+    print_dice_val(win_wrapper, v1, game_manager->dice_roll.used1);
+    print_dice_val(win_wrapper, v2, game_manager->dice_roll.used2);
   }
+}
+
+void print_stats_header(WinWrapper *win_wrapper, GameManager *game_manager) {
+  mv_printf_centered(win_wrapper, STATS_WHITE_Y, "-> White");
+  printf_centered_nl(win_wrapper, "out: %02d",
+                     game_manager->board.white_out_count);
+
+  mv_printf_centered(win_wrapper, STATS_RED_Y, "-> Red");
+  printf_centered_nl(win_wrapper, "out: %02d",
+                     game_manager->board.red_out_count);
+}
+
+void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
+  print_stats_header(win_wrapper, game_manager);
+
+  int y = STATS_LINES_COUNT - 1;
+  if (game_manager->curr_player == White)
+    y += STATS_WHITE_Y;
+  else
+    y += STATS_RED_Y;
+
+  int x = STATS_ROLL_X;
+
+  if (game_manager->dice_roll.v1 == game_manager->dice_roll.v2) {
+    x = STATS_ROLL_DOUBLET_X;
+  }
+  print_stats_roll(win_wrapper, game_manager, y, x);
 }
 
 void display_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
@@ -1118,7 +1144,7 @@ void display_game(WinManager *win_manager, GameManager *game_manager) {
 }
 
 int input_int(WinWrapper *io_wrapper, const char *prompt) {
-  printf_centered_on_new_line(io_wrapper, "%s", prompt);
+  printf_centered_nl(io_wrapper, "%s", prompt);
   int res = -1;
   wscanw(io_wrapper->win, "%d", &res);
   move_rel(io_wrapper, -1, 0);
@@ -1155,8 +1181,7 @@ bool make_move_loop(WinManager *win_manager, GameManager *game_manager) {
     if (quit)
       return true;
 
-    legal = can_use_roll_val(&game_manager->dice_roll, by) &&
-            player_move(game_manager, from, by);
+    legal = player_move(game_manager, from, by);
 
     clear_refresh_win(&win_manager->io_win);
   }
@@ -1185,23 +1210,26 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
   return false;
 }
 
+void log_new_turn(GameManager *game_manager) {
+  TurnEntry turn_entry;
+  turn_entry_new(&turn_entry, &game_manager->dice_roll);
+  push_to_turn_log(&game_manager->turn_log, &turn_entry);
+}
+
 bool play_turn(WinManager *win_manager, GameManager *game_manager,
                bool resume) {
   if (!resume) {
-    TurnEntry turn_entry;
-    turn_entry_new(&turn_entry, &game_manager->dice_roll);
-    push_to_turn_log(&game_manager->turn_log, &turn_entry);
+    log_new_turn(game_manager);
   }
 
-  int enter_moves_count = legal_enters_count(game_manager);
-  for (int i = 0; i < enter_moves_count; i++) {
+  for (int i = 0; i < legal_enters_count(game_manager); i++) {
     if (make_enter_move_loop(win_manager, game_manager))
       return true;
+
     display_game(win_manager, game_manager);
   }
 
-  while (!dice_roll_used(&game_manager->dice_roll) &&
-         any_move_legal(game_manager)) {
+  while (any_move_legal(game_manager)) {
     if (make_move_loop(win_manager, game_manager))
       return true;
 
@@ -1221,6 +1249,29 @@ CheckerKind check_game_over(GameManager *game_manager) {
     return Red;
   return None;
 }
+
+bool check_handle_win(WinManager *win_manager, GameManager *game_manager) {
+  CheckerKind won = check_game_over(game_manager);
+  if (won == None)
+    return false;
+
+  clear_refresh_win(&win_manager->content_win);
+  mv_printf_centered(&win_manager->content_win, CONTENT_Y_END / 2,
+                     "Game Over!");
+
+  if (won == White)
+    printf_centered_nl(&win_manager->content_win, "White Wins!");
+  else
+    printf_centered_nl(&win_manager->content_win, "Red Wins!");
+
+  win_char_input(&win_manager->io_win);
+  return true;
+}
+
+bool save_game(WinManager *win_manager, GameManager *game_manager) {
+  return serialize_game(game_manager, "test.txt");
+}
+
 void game_loop(WinManager *win_manager, GameManager *game_manager,
                bool resume) {
   enable_cursor();
@@ -1231,24 +1282,12 @@ void game_loop(WinManager *win_manager, GameManager *game_manager,
     if (play_turn(win_manager, game_manager, resume)) {
       break;
     }
-    resume = false;
-    CheckerKind won = check_game_over(game_manager);
-    if (won != None) {
-      clear_refresh_win(&win_manager->content_win);
-      mv_printf_centered(&win_manager->content_win, CONTENT_Y_END / 2,
-                         "Game Over!");
-
-      if (won == White)
-        printf_centered_on_new_line(&win_manager->content_win, "White Wins!");
-      else
-        printf_centered_on_new_line(&win_manager->content_win, "Red Wins!");
-
-      win_char_input(&win_manager->io_win);
+    if (check_handle_win(win_manager, game_manager))
       break;
-    }
+    resume = false;
   }
 
-  serialize_game(game_manager, "test.txt");
+  save_game(win_manager, game_manager);
   clear_refresh_win(&win_manager->io_win);
   clear_refresh_win(&win_manager->stats_win);
   disable_cursor();
@@ -1308,14 +1347,22 @@ void resume_game_from_watch(WinManager *win_manager,
   game_loop(win_manager, game_manager, true);
 }
 
-void watch_menu_loop(WinManager *win_manager) {
+bool init_watch_menu(WinManager *win_manager, GameManager *game_manager,
+                     GameManager *end_game) {
   clear_refresh_win(&win_manager->io_win);
-  GameManager game_manager, end_game;
-  if (!load_game(win_manager, &game_manager)) {
-    return;
+  if (!load_game(win_manager, game_manager)) {
+    return false;
   }
-  end_game = game_manager;
-  trav_apply_to_start(&game_manager);
+  *end_game = *game_manager;
+  trav_apply_to_start(game_manager);
+  return true;
+}
+
+void watch_menu_loop(WinManager *win_manager) {
+  GameManager game_manager, end_game;
+  if (!init_watch_menu(win_manager, &game_manager, &end_game))
+    return;
+
   while (true) {
     display_game(win_manager, &game_manager);
     switch (char_input()) {
