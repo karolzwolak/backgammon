@@ -98,6 +98,19 @@ void use_roll_val(DiceRoll *dice_roll, int val) {
   }
 }
 
+void reverse_use_roll_val(DiceRoll *dice_roll, int val) {
+  if (dice_roll->v1 == dice_roll->v2 && val == dice_roll->v1) {
+    dice_roll->doublet_times_used--;
+    return;
+  }
+  if (val == dice_roll->v1) {
+    dice_roll->used1 = false;
+  }
+  if (val == dice_roll->v2) {
+    dice_roll->used2 = false;
+  }
+}
+
 bool dice_roll_used(DiceRoll *dice_roll) {
   return (dice_roll->v1 == dice_roll->v2 &&
           dice_roll->doublet_times_used >= MAX_DOUBLET_USES) ||
@@ -860,16 +873,20 @@ void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
   int by = move_entry->by;
   int dest = move_dest(game_manager, from, by);
 
-  if (reverse)
+  if (reverse) {
     move_checker(game_manager, from, dest, reverse);
+    reverse_use_roll_val(&game_manager->dice_roll, by);
+  }
 
   if (move_entry->hit_enemy) {
     move_checker(game_manager, dest, ENEMY_BAR_POS(game_manager->curr_player),
                  reverse);
   }
 
-  if (!reverse)
+  if (!reverse) {
     move_checker(game_manager, from, dest, reverse);
+    use_roll_val(&game_manager->dice_roll, by);
+  }
 }
 
 void apply_turn_entry(TurnEntry *turn_entry, GameManager *game_manager) {
@@ -1061,11 +1078,10 @@ void print_stats(WinWrapper *win_wrapper, GameManager *game_manager) {
     for (int i = 0; i < game_manager->dice_roll.doublet_times_used; i++)
       win_printf(win_wrapper, " _");
   } else {
-    if (game_manager->dice_roll.used1) {
-      win_printf(win_wrapper, " %d _", v2);
-      return;
-    }
-    win_printf(win_wrapper, " %d", v1);
+    if (!game_manager->dice_roll.used1)
+      win_printf(win_wrapper, " %d", v1);
+    else
+      win_printf(win_wrapper, " _");
     if (!game_manager->dice_roll.used2)
       win_printf(win_wrapper, " %d", v2);
     else
