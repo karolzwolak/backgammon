@@ -14,19 +14,21 @@
 
 #define MAX_DOUBLET_USES 4
 
-#define WHITE_HOME_START 5
-#define RED_HOME_START BOARD_SIZE - 5
+#define WHITE_HOME_START BOARD_SIZE - 5
+#define RED_HOME_START 5
+#define home_start(player) player == White ? WHITE_HOME_START : RED_HOME_START
 
-#define WHITE_OUT_START -1
-#define RED_OUT_START BOARD_SIZE
+#define WHITE_OUT_START BOARD_SIZE
+#define RED_OUT_START -1
+#define out_start(player) player == White ? WHITE_OUT_START : RED_OUT_START
 
-#define WHITE_BAR_POS -7
-#define RED_BAR_POS -8
+#define WHITE_BAR_POS -8
+#define RED_BAR_POS -7
 #define PLAYER_BAR_POS(player) player == White ? WHITE_BAR_POS : RED_BAR_POS
 #define ENEMY_BAR_POS(player) player == White ? RED_BAR_POS : WHITE_BAR_POS
 
-#define WHITE_DIR -1
-#define RED_DIR 1
+#define WHITE_DIR 1
+#define RED_DIR -1
 #define CHECKER_DIR(checker_kind) checker_kind == White ? WHITE_DIR : RED_DIR
 
 #define CHECKER_COUNT 15
@@ -38,8 +40,9 @@
 #define STATS_GAP 3
 #define STATS_TOP_BOT_MARGIN                                                   \
   (SIDE_WIN_HEIGHT - STATS_GAP - 2 * STATS_LINES_COUNT) / 2
-#define STATS_WHITE_Y STATS_TOP_BOT_MARGIN
-#define STATS_RED_Y SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
+
+#define STATS_WHITE_Y SIDE_WIN_HEIGHT - STATS_TOP_BOT_MARGIN - STATS_LINES_COUNT
+#define STATS_RED_Y STATS_TOP_BOT_MARGIN
 
 #define STATS_ROLL_X 4
 #define STATS_ROLL_DOUBLET_X 1
@@ -209,10 +212,10 @@ void print_checkers_on_bar(WinWrapper *win_wrapper, BoardPoint *board_point) {
 
   int start_y, move_dir = CHECKER_DIR(board_point->checker_kind);
 
-  if (board_point->checker_kind == Red) {
-    start_y = CONTENT_Y_START + 1;
+  if (board_point->checker_kind == White) {
+    start_y = CONTENT_Y_START;
   } else {
-    start_y = CONTENT_Y_END - 1;
+    start_y = CONTENT_Y_END;
   }
 
   for (int i = 0; i < board_point->checker_count; i++) {
@@ -758,19 +761,54 @@ void swap_players(GameManager *game_manager) {
   }
 }
 
+bool is_pos_out(int pos) {
+  return (pos > RED_BAR_POS && pos <= RED_OUT_START) || pos >= WHITE_OUT_START;
+}
+
+bool is_pos_on_bar(int pos) {
+  return pos == WHITE_BAR_POS || pos == RED_BAR_POS;
+}
+
+CheckerKind checker_kind_at(Board *board, int pos) {
+  if (pos == WHITE_BAR_POS || pos >= WHITE_OUT_START)
+    return White;
+  if (pos == RED_BAR_POS || pos <= RED_OUT_START)
+    return Red;
+  return board->board_points[pos].checker_kind;
+}
+
+int checker_move_by(CheckerKind checker_kind, int from, int by) {
+  return from + by * (CHECKER_DIR(checker_kind));
+}
+
+int enter_dest(CheckerKind checker_kind, int move_by) {
+  return out_start(opposite_checker(checker_kind)) +
+         move_by * CHECKER_DIR(checker_kind);
+}
+
+int move_dest(GameManager *game_manager, int from, int move_by) {
+  if (from == WHITE_BAR_POS) {
+    return enter_dest(White, move_by);
+  } else if (from == RED_BAR_POS) {
+    return enter_dest(Red, move_by);
+  }
+  return checker_move_by(checker_kind_at(&game_manager->board, from), from,
+                         move_by);
+}
+
 bool can_player_bear_off(GameManager *game_manager) {
   int sum = 0;
   Board *board = &game_manager->board;
   if (game_manager->curr_player == White) {
     sum += board->white_out_count;
-    for (int i = WHITE_HOME_START; i > WHITE_OUT_START; i--) {
+    for (int i = WHITE_HOME_START; i < WHITE_OUT_START; i++) {
       if (board->board_points[i].checker_kind != game_manager->curr_player)
         continue;
       sum += board->board_points[i].checker_count;
     }
   } else {
     sum += board->red_out_count;
-    for (int i = RED_HOME_START; i < RED_OUT_START; i++) {
+    for (int i = RED_HOME_START; i > RED_OUT_START; i--) {
       if (board->board_points[i].checker_kind != game_manager->curr_player)
         continue;
       sum += board->board_points[i].checker_count;
@@ -786,48 +824,6 @@ bool can_player_move_to_point(GameManager *game_manager, int dest) {
          game_manager->board.board_points[dest].checker_count <= 1;
 }
 
-bool is_pos_out(int pos) {
-  return (pos > WHITE_BAR_POS && pos <= WHITE_OUT_START) ||
-         pos >= RED_OUT_START;
-}
-
-bool is_pos_on_bar(int pos) {
-  return pos == WHITE_BAR_POS || pos == RED_BAR_POS;
-}
-
-CheckerKind checker_kind_at(Board *board, int pos) {
-  if (pos == RED_BAR_POS || pos >= RED_OUT_START)
-    return Red;
-  if (pos == WHITE_BAR_POS || pos <= WHITE_OUT_START)
-    return White;
-  return board->board_points[pos].checker_kind;
-}
-
-int enter_dest(CheckerKind checker_kind, int move_by) {
-  if (checker_kind == White) {
-    return RED_OUT_START - move_by;
-  } else if (checker_kind == Red) {
-    return WHITE_OUT_START + move_by;
-  }
-  return -1;
-}
-
-int move_dest(GameManager *game_manager, int from, int move_by) {
-  if (from == WHITE_BAR_POS) {
-    return enter_dest(White, move_by);
-  } else if (from == RED_BAR_POS) {
-    return enter_dest(Red, move_by);
-  }
-  int dest = from;
-
-  if (game_manager->curr_player == White) {
-    dest -= move_by;
-  } else if (game_manager->curr_player == Red) {
-    dest += move_by;
-  }
-  return dest;
-}
-
 // check if move from point is legal
 bool is_move_legal(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
@@ -838,8 +834,8 @@ bool is_move_legal(GameManager *game_manager, int from, int move_by) {
     return false;
 
   if (is_pos_out(dest)) {
-    if ((dest <= WHITE_OUT_START && game_manager->curr_player != White) ||
-        (dest >= RED_OUT_START && game_manager->curr_player != Red))
+    if ((dest >= WHITE_OUT_START && game_manager->curr_player != White) ||
+        (dest <= RED_OUT_START && game_manager->curr_player != Red))
       return false;
     return can_player_bear_off(game_manager);
   }
