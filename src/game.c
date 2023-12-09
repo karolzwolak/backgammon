@@ -534,16 +534,7 @@ void game_add_move_entry(GameManager *game_manager, int from, int by,
   turn_entry_add_move(turn_entry, from, by, hit_enemy);
 }
 
-bool serialize_game(GameManager *game_manager, char *filename) {
-  FILE *fp = fopen(filename, "w");
-
-  if (fp == NULL)
-    return false;
-
-  fprintf(fp, "%s\n", FILE_HEADER);
-  fprintf(fp, "\n");
-  Board *board = &game_manager->board;
-
+bool serialize_board_points(Board *board, FILE *fp) {
   for (int i = 0; i < BOARD_SIZE; i++) {
     if (board->board_points[i].checker_kind == None ||
         board->board_points[i].checker_count == 0)
@@ -553,6 +544,13 @@ bool serialize_game(GameManager *game_manager, char *filename) {
                  board->board_points[i].checker_count))
       return false;
   }
+  return true;
+}
+
+bool serialize_board(Board *board, FILE *fp) {
+  if (!serialize_board_points(board, fp))
+    return false;
+
   fprintf(fp, "\n");
   fprintf(fp, "bar %c %d\n", checker_char(board->white_bar.checker_kind),
           board->white_bar.checker_count);
@@ -562,12 +560,29 @@ bool serialize_game(GameManager *game_manager, char *filename) {
   fprintf(fp, "\n");
   fprintf(fp, "out %c %d\n", checker_char(White), board->white_out_count);
   fprintf(fp, "out %c %d\n", checker_char(Red), board->red_out_count);
-
   fprintf(fp, "\n");
+  return true;
+}
+
+void serialize_player_roll(GameManager *game_manager, FILE *fp) {
   DiceRoll *dice_roll = &game_manager->dice_roll;
   fprintf(fp, "player %c\n", checker_char(game_manager->curr_player));
   fprintf(fp, "roll v:%d v:%d u:%d u:%d d_u:%d\n", dice_roll->v1, dice_roll->v2,
           dice_roll->used1, dice_roll->used2, dice_roll->doublet_times_used);
+  fprintf(fp, "\n");
+}
+
+bool serialize_game(GameManager *game_manager, char *filename) {
+  FILE *fp = fopen(filename, "w");
+
+  if (fp == NULL)
+    return false;
+
+  Board *board = &game_manager->board;
+  fprintf(fp, "%s\n", FILE_HEADER);
+
+  if (!serialize_board(board, fp))
+    return false;
 
   serialize_turn_log(&game_manager->turn_log, fp);
 

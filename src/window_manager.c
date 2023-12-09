@@ -6,40 +6,58 @@
 #include <ncurses.h>
 #include <time.h>
 
+WinWrapper main_w(int y, int x) {
+  return new_win_wrapper(MIN_HEIGHT, MIN_WIDTH, y, x, true);
+}
+
+WinWrapper about_w(int y, int x) {
+  return new_win_wrapper(ABOUT_WIN_HEIGHT, ABOUT_WIN_WIDTH, y, x, true);
+}
+
+WinWrapper legend_w(int y, int x) {
+  return new_win_wrapper(SIDE_WIN_HEIGHT, SIDE_WIN_WIDTH, y, x, true);
+}
+
+WinWrapper content_w(int y, int x) {
+  return new_win_wrapper(CONTENT_WIN_HEIGHT, CONTENT_WIN_WIDTH, y, x, true);
+}
+
+WinWrapper stats_w(int y, int x) {
+  return new_win_wrapper(SIDE_WIN_HEIGHT, SIDE_WIN_WIDTH, y, x, true);
+}
+
+WinWrapper io_w(int y, int x) {
+  return new_win_wrapper(IO_WIN_HEIGHT, IO_WIN_WIDTH, y, x, true);
+}
+
+void setup_main_win(WinManager *manager, int *y_start, int *x_start) {
+  getmaxyx(stdscr, manager->term_height, manager->term_width);
+
+  *y_start = (manager->term_height - MIN_HEIGHT) / 2;
+  *x_start = (manager->term_width - MIN_WIDTH) / 2;
+
+  manager->main_win = main_w(*y_start, *x_start);
+
+  *y_start += WIN_V_MARGIN + 1;
+  *x_start += WIN_H_MARGIN + 1;
+}
+
 WinManager new_win_manager() {
-  int term_height, term_width;
-  getmaxyx(stdscr, term_height, term_width);
+  WinManager res;
+  int x_start, y_start;
+  setup_main_win(&res, &y_start, &x_start);
 
-  int y_start = (term_height - MIN_HEIGHT) / 2;
-  int x_start = (term_width - MIN_WIDTH) / 2;
+  res.about_win = about_w(y_start, x_start);
+  res.legend_win = legend_w(y_end(&res.about_win) + WIN_V_MARGIN, x_start);
 
-  WinWrapper main_win =
-      new_win_wrapper(MIN_HEIGHT, MIN_WIDTH, y_start, x_start, true);
+  res.content_win = content_w(y_end(&res.about_win) + WIN_V_MARGIN,
+                              x_end(&res.legend_win) + WIN_H_MARGIN);
 
-  y_start += WIN_VERTICAL_MARGIN + 1;
-  x_start += WIN_HORIZONTAL_MARGIN + 1;
+  res.stats_win = stats_w(y_end(&res.about_win) + WIN_V_MARGIN,
+                          x_end(&res.content_win) + WIN_H_MARGIN);
 
-  WinWrapper about_win = new_win_wrapper(ABOUT_WIN_HEIGHT, ABOUT_WIN_WIDTH,
-                                         y_start, x_start, true);
-  WinWrapper legend_win =
-      new_win_wrapper(SIDE_WIN_HEIGHT, SIDE_WIN_WIDTH,
-                      y_end(&about_win) + WIN_VERTICAL_MARGIN, x_start, true);
+  res.io_win = io_w(y_end(&res.content_win) + WIN_V_MARGIN, x_start);
 
-  WinWrapper content_win =
-      new_win_wrapper(CONTENT_WIN_HEIGHT, CONTENT_WIN_WIDTH,
-                      y_end(&about_win) + WIN_VERTICAL_MARGIN,
-                      x_end(&legend_win) + WIN_HORIZONTAL_MARGIN, true);
-
-  WinWrapper stats_win = new_win_wrapper(
-      SIDE_WIN_HEIGHT, SIDE_WIN_WIDTH, y_end(&about_win) + WIN_VERTICAL_MARGIN,
-      x_end(&content_win) + WIN_HORIZONTAL_MARGIN, true);
-
-  WinWrapper io_win =
-      new_win_wrapper(IO_WIN_HEIGHT, IO_WIN_WIDTH,
-                      y_end(&content_win) + WIN_VERTICAL_MARGIN, x_start, true);
-
-  WinManager res = {main_win,  about_win, legend_win,  content_win,
-                    stats_win, io_win,    term_height, term_width};
   return res;
 }
 

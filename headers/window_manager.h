@@ -4,8 +4,8 @@
 const int VERTICAL_MARGIN = 2;
 const int IN_BETWEEN_LINES_MARGIN = 1;
 
-const int WIN_HORIZONTAL_MARGIN = 2;
-const int WIN_VERTICAL_MARGIN = 1;
+const int WIN_H_MARGIN = 2;
+const int WIN_V_MARGIN = 1;
 
 // count of rows inside board
 const int BOARD_ROW_COUNT = 5;
@@ -35,14 +35,14 @@ const int SIDE_WIN_WIDTH = 16;
 
 const int ABOUT_WIN_HEIGHT = 3;
 const int ABOUT_WIN_WIDTH =
-    2 * WIN_HORIZONTAL_MARGIN + SIDE_WIN_WIDTH * 2 + CONTENT_WIN_WIDTH;
+    2 * WIN_H_MARGIN + SIDE_WIN_WIDTH * 2 + CONTENT_WIN_WIDTH;
 
 const int IO_WIN_HEIGHT = CONTENT_WIN_HEIGHT / 2;
 const int IO_WIN_WIDTH = ABOUT_WIN_WIDTH;
 
 const int MIN_HEIGHT = ABOUT_WIN_HEIGHT + CONTENT_WIN_HEIGHT + IO_WIN_HEIGHT +
-                       4 * WIN_VERTICAL_MARGIN + 2;
-const int MIN_WIDTH = ABOUT_WIN_WIDTH + 2 * WIN_HORIZONTAL_MARGIN + 2;
+                       4 * WIN_V_MARGIN + 2;
+const int MIN_WIDTH = ABOUT_WIN_WIDTH + 2 * WIN_H_MARGIN + 2;
 
 typedef struct {
   WinWrapper main_win, about_win, legend_win, content_win, stats_win, io_win;
