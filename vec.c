@@ -1,4 +1,4 @@
-#include "../headers/vec.h"
+#include "vec.h"
 #include <stdlib.h>
 
 void vec_with_cap(Vec *vec_out, size_t elem_size, int cap) {

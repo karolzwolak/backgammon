@@ -1,6 +1,6 @@
-#include "../headers/game.h"
-#include "../headers/window.h"
-#include "../headers/window_manager.h"
+#include "game.h"
+#include "window.h"
+#include "window_manager.h"
 
 #include "vec.c"
 #include <ncurses.h>
@@ -939,7 +939,6 @@ bool is_move_legal_forced(WinManager *win_manager, GameManager *game_manager,
                           int from, int move_by) {
   clear_win(&win_manager->io_win);
 
-  Board *board = &game_manager->board;
   int dest = move_dest(game_manager, from, move_by);
   if (!is_move_legal_basic(game_manager, from, move_by)) {
     printf_centered_nl(&win_manager->io_win, "illegal move");

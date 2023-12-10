@@ -1,4 +1,4 @@
-#include "src/window_manager.c"
+#include "window_manager.c"
 #include <ncurses.h>
 
 void init_ncurses() {

@@ -1,4 +1,4 @@
-#include "../headers/window.h"
+#include "window.h"
 #include <ctype.h>
 #include <ncurses.h>
 #include <string.h>

@@ -1,8 +1,8 @@
-#include "../headers/window_manager.h"
-#include "../headers/game.h"
-#include "../headers/window.h"
+#include "window_manager.h"
 #include "game.c"
+#include "game.h"
 #include "window.c"
+#include "window.h"
 #include <ncurses.h>
 #include <time.h>
 
