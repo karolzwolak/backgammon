@@ -926,16 +926,8 @@ bool is_move_legal_basic(GameManager *game_manager, int from, int move_by) {
   return can_player_move_to_point(game_manager, dest);
 }
 
-bool is_move_legal_forced(WinManager *win_manager, GameManager *game_manager,
-                          int from, int move_by) {
-  clear_win(&win_manager->io_win);
-
-  Board *board = &game_manager->board;
-  int dest = move_dest(game_manager, from, move_by);
-  if (!is_move_legal_basic(game_manager, from, move_by)) {
-    printf_centered_nl(&win_manager->io_win, "illegal move");
-    return false;
-  }
+bool check_passes_forced(WinManager *win_manager, GameManager *game_manager,
+                         int dest) {
   int fpos = fhit_pos(game_manager);
   bool hits_fhit = fpos == dest && dest != -1;
   bool passes_fhit = fpos == -1 || hits_fhit;
@@ -951,8 +943,21 @@ bool is_move_legal_forced(WinManager *win_manager, GameManager *game_manager,
                        fpos + 1);
   if (!passes_f_out)
     printf_centered_nl(&win_manager->io_win, "you have to bear off");
-
   return false;
+}
+
+bool is_move_legal_forced(WinManager *win_manager, GameManager *game_manager,
+                          int from, int move_by) {
+  clear_win(&win_manager->io_win);
+
+  Board *board = &game_manager->board;
+  int dest = move_dest(game_manager, from, move_by);
+  if (!is_move_legal_basic(game_manager, from, move_by)) {
+    printf_centered_nl(&win_manager->io_win, "illegal move");
+    return false;
+  }
+
+  return check_passes_forced(win_manager, game_manager, dest);
 }
 
 bool is_enter_legal_basic(GameManager *game_manager, int move_by) {
