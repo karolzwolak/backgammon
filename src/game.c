@@ -836,6 +836,31 @@ int fhit_pos(GameManager *game_manager) {
   return fhit_pos_white(game_manager);
 }
 
+bool check_fhit_pos_enter(GameManager *game_manager, int d_val) {
+  int pos = enter_dest(game_manager->curr_player, d_val);
+
+  return checker_kind_at(&game_manager->board, pos) ==
+             opposite_checker(game_manager->curr_player) &&
+         game_manager->board.board_points[pos].checker_count == 1;
+}
+
+int fhit_pos_enter(GameManager *game_manager) {
+  DiceRoll *dice_roll = &game_manager->dice_roll;
+  int v1 = dice_roll->v1;
+  int v2 = dice_roll->v2;
+
+  bool can_hit_dice1 =
+      can_use_roll_val(dice_roll, v1) && check_fhit_pos_enter(game_manager, v1);
+  bool can_hit_dice2 =
+      can_use_roll_val(dice_roll, v2) && check_fhit_pos_enter(game_manager, v2);
+
+  if (can_hit_dice1)
+    return enter_dest(game_manager->curr_player, v1);
+  if (can_hit_dice2)
+    return enter_dest(game_manager->curr_player, v2);
+  return -1;
+}
+
 bool check_fhit(GameManager *game_manager, int dest) {
   int pos = fhit_pos(game_manager);
   return pos != -1 && pos == dest;
@@ -933,13 +958,14 @@ bool is_enter_legal_basic(GameManager *game_manager, int move_by) {
 bool is_enter_legal_forced(WinManager *win_manager, GameManager *game_manager,
                            int move_by) {
   clear_win(&win_manager->io_win);
+
   if (!is_enter_legal_basic(game_manager, move_by)) {
     printf_centered_nl(&win_manager->io_win, "illegal move");
     return false;
   }
   int dest = enter_dest(game_manager->curr_player, move_by);
 
-  int fpos = fhit_pos(game_manager);
+  int fpos = fhit_pos_enter(game_manager);
   bool passes_fhit = fpos == -1 || fpos == dest;
   if (passes_fhit)
     return true;
@@ -1285,7 +1311,6 @@ bool make_move_loop(WinManager *win_manager, GameManager *game_manager) {
   bool legal = false;
   int by, from;
   while (!legal) {
-    // clear_refresh_win(&win_manager->io_win);
     by = -1;
     from = -1;
     bool quit = move_input(win_manager, &from, &by);
@@ -1314,7 +1339,7 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
     legal = can_use_roll_val(&game_manager->dice_roll, val) &&
             player_enter(win_manager, game_manager, val);
 
-    clear_refresh_win(&win_manager->io_win);
+    refresh_win(&win_manager->io_win);
   }
   use_roll_val(&game_manager->dice_roll, val);
 
