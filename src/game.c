@@ -1101,8 +1101,8 @@ void print_stats_roll(WinWrapper *win_wrapper, GameManager *game_manager, int y,
 
   mv_printf_yx(win_wrapper, y, x, " roll", v1);
   if (v1 == v2) {
-    for (int i = MAX_DOUBLET_USES; i > 0; i--)
-      print_dice_val(win_wrapper, v1, d_times > i);
+    for (int i = 0; i < MAX_DOUBLET_USES; i++)
+      print_dice_val(win_wrapper, v1, i + d_times >= MAX_DOUBLET_USES);
   } else {
     print_dice_val(win_wrapper, v1, game_manager->dice_roll.used1);
     print_dice_val(win_wrapper, v2, game_manager->dice_roll.used2);
