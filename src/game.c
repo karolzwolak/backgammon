@@ -1,8 +1,9 @@
 #include "../headers/game.h"
+#include "../headers/vec.h"
 #include "../headers/window.h"
 #include "../headers/window_manager.h"
 
-#include "vec.c"
+#include "hall_of_fame.c"
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,8 +124,9 @@ bool dice_roll_used(DiceRoll *dice_roll) {
 }
 
 typedef struct {
-  const char *name;
+  char *name;
   CheckerKind checker_kind;
+  int score;
 } Player;
 
 typedef struct {
@@ -494,19 +496,13 @@ void add_to_out(Board *board, CheckerKind checker_kind, int d_count) {
 typedef struct {
   Board board;
 
-  Player white_player;
-  Player red_player;
-
   CheckerKind curr_player;
   DiceRoll dice_roll;
 
   TurnLog turn_log;
 } GameManager;
 
-GameManager new_game_manager(const char *white_name, const char *red_name) {
-  Player white = {white_name, White};
-  Player red = {red_name, Red};
-
+GameManager new_game_manager() {
   CheckerKind curr_player = White;
   DiceRoll dice_roll;
   do {
@@ -519,8 +515,8 @@ GameManager new_game_manager(const char *white_name, const char *red_name) {
   TurnLog turn_log;
   new_turn_log(&turn_log, 0);
 
-  GameManager game_manager = {default_board(), white,     red,
-                              curr_player,     dice_roll, turn_log};
+  GameManager game_manager = {default_board(), curr_player, dice_roll,
+                              turn_log};
   return game_manager;
 }
 
@@ -1302,16 +1298,6 @@ int input_int(WinWrapper *io_wrapper, const char *prompt) {
   return res;
 }
 
-void init_game(WinManager *win_manager, GameManager *game_manager) {
-  char white_name[MAX_INPUT_LEN];
-  char red_name[MAX_INPUT_LEN];
-
-  prompt_input(&win_manager->io_win, "enter white name: ", white_name);
-  prompt_input(&win_manager->io_win, "enter red name: ", red_name);
-  clear_refresh_win(&win_manager->io_win);
-  *game_manager = new_game_manager(white_name, red_name);
-}
-
 bool move_input(WinManager *win_manager, int *from, int *by) {
   bool quit =
       int_prompt_input_untill(&win_manager->io_win, "Move from: ", from);
@@ -1499,8 +1485,7 @@ bool play_load_game(WinManager *win_manager) {
 bool play_new_game(WinManager *win_manager) {
   enable_cursor();
 
-  GameManager game_manager;
-  game_manager = new_game_manager("white", "red");
+  GameManager game_manager = new_game_manager();
   game_loop(win_manager, &game_manager, false);
 
   return true;
@@ -1569,6 +1554,9 @@ void play_menu_loop(WinManager *win_manager) {
     case 'n':
       play_new_game(win_manager);
       return;
+    case 'a':
+      add_one_player(15, "test");
+      break;
     case 'q':
       return;
     }
