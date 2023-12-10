@@ -790,6 +790,57 @@ int move_dest(GameManager *game_manager, int from, int move_by) {
                          move_by);
 }
 
+// returns true if there was definitive answer
+bool check_fhit_pos(Board *board, CheckerKind curr_player, DiceRoll *dice_roll,
+                    int pos) {
+
+  CheckerKind enemy = opposite_checker(curr_player);
+  if (checker_kind_at(board, pos) != enemy ||
+      board->board_points[pos].checker_count > 1)
+    return false;
+  int from1 = pos - dice_roll->v1 * (CHECKER_DIR(curr_player));
+  int from2 = pos - dice_roll->v2 * (CHECKER_DIR(curr_player));
+  bool can_hit_from1 = can_use_roll_val(dice_roll, dice_roll->v1) &&
+                       checker_kind_at(board, from1) == curr_player;
+  bool can_hit_from2 = can_use_roll_val(dice_roll, dice_roll->v2) &&
+                       checker_kind_at(board, from2) == curr_player;
+
+  return can_hit_from1 || can_hit_from2;
+}
+
+int fhit_pos_red(GameManager *game_manager) {
+  Board *board = &game_manager->board;
+  DiceRoll *dice_roll = &game_manager->dice_roll;
+  for (int i = out_start(White) - 1; i >= 0; i--) {
+    if (!check_fhit_pos(board, Red, dice_roll, i))
+      continue;
+    return i;
+  }
+  return -1;
+}
+
+int fhit_pos_white(GameManager *game_manager) {
+  Board *board = &game_manager->board;
+  DiceRoll *dice_roll = &game_manager->dice_roll;
+  for (int i = out_start(Red) + 1; i < BOARD_SIZE; i++) {
+    if (!check_fhit_pos(board, White, dice_roll, i))
+      continue;
+    return i;
+  }
+  return -1;
+}
+
+int fhit_pos(GameManager *game_manager) {
+  if (game_manager->curr_player == Red)
+    return fhit_pos_red(game_manager);
+  return fhit_pos_white(game_manager);
+}
+
+bool check_fhit(GameManager *game_manager, int dest) {
+  int pos = fhit_pos(game_manager);
+  return pos != -1 && pos == dest;
+}
+
 bool can_player_bear_off(GameManager *game_manager) {
   int sum = 0;
   Board *board = &game_manager->board;
@@ -812,6 +863,12 @@ bool can_player_bear_off(GameManager *game_manager) {
   return sum == CHECKER_COUNT;
 }
 
+// dont check if player can bear off at all
+bool check_f_bear_off(GameManager *game_manager, int dest) {
+  return ((dest >= WHITE_OUT_START && game_manager->curr_player == White) ||
+          (dest <= RED_OUT_START && game_manager->curr_player == Red));
+}
+
 bool can_player_move_to_point(GameManager *game_manager, int dest) {
   return game_manager->board.board_points[dest].checker_kind ==
              game_manager->curr_player ||
@@ -819,7 +876,7 @@ bool can_player_move_to_point(GameManager *game_manager, int dest) {
 }
 
 // check if move from point is legal
-bool is_move_legal(GameManager *game_manager, int from, int move_by) {
+bool is_move_legal_basic(GameManager *game_manager, int from, int move_by) {
   Board *board = &game_manager->board;
   int dest = move_dest(game_manager, from, move_by);
 
@@ -836,12 +893,59 @@ bool is_move_legal(GameManager *game_manager, int from, int move_by) {
   return can_player_move_to_point(game_manager, dest);
 }
 
-bool is_enter_legal(GameManager *game_manager, int move_by) {
+bool is_move_legal_forced(WinManager *win_manager, GameManager *game_manager,
+                          int from, int move_by) {
+  clear_win(&win_manager->io_win);
+
+  Board *board = &game_manager->board;
+  int dest = move_dest(game_manager, from, move_by);
+  if (!is_move_legal_basic(game_manager, from, move_by)) {
+    printf_centered_nl(&win_manager->io_win, "illegal move");
+    return false;
+  }
+  int fpos = fhit_pos(game_manager);
+  bool hits_fhit = fpos == dest && dest != -1;
+  bool passes_fhit = fpos == -1 || hits_fhit;
+
+  bool bears_off = check_f_bear_off(game_manager, dest);
+  bool passes_f_out = !can_player_bear_off(game_manager) || bears_off;
+
+  if ((passes_fhit && passes_f_out) || hits_fhit || bears_off)
+    return true;
+
+  if (!passes_fhit)
+    printf_centered_nl(&win_manager->io_win, "you have to hit #%d pos",
+                       fpos + 1);
+  if (!passes_f_out)
+    printf_centered_nl(&win_manager->io_win, "you have to bear off");
+
+  return false;
+}
+
+bool is_enter_legal_basic(GameManager *game_manager, int move_by) {
   if (game_manager->curr_player == None || move_by <= 0)
     return false;
 
   int pos = enter_dest(game_manager->curr_player, move_by);
   return can_player_move_to_point(game_manager, pos);
+}
+
+bool is_enter_legal_forced(WinManager *win_manager, GameManager *game_manager,
+                           int move_by) {
+  clear_win(&win_manager->io_win);
+  if (!is_enter_legal_basic(game_manager, move_by)) {
+    printf_centered_nl(&win_manager->io_win, "illegal move");
+    return false;
+  }
+  int dest = enter_dest(game_manager->curr_player, move_by);
+
+  int fpos = fhit_pos(game_manager);
+  bool passes_fhit = fpos == -1 || fpos == dest;
+  if (passes_fhit)
+    return true;
+
+  printf_centered_nl(&win_manager->io_win, "you have to hit #%d pos", fpos + 1);
+  return false;
 }
 
 void move_checker(GameManager *game_manager, int from, int dest, bool reverse) {
@@ -979,8 +1083,9 @@ void trav_delete_next_moves(TurnLog *turn_log) {
 }
 
 // returns whether move was legal
-bool player_move(GameManager *game_manager, int from, int move_by) {
-  if (!is_move_legal(game_manager, from, move_by))
+bool player_move(WinManager *win_manager, GameManager *game_manager, int from,
+                 int move_by) {
+  if (!is_move_legal_forced(win_manager, game_manager, from, move_by))
     return false;
 
   int hit_enemy = move_checker_check_hit(game_manager, from, move_by);
@@ -989,8 +1094,9 @@ bool player_move(GameManager *game_manager, int from, int move_by) {
   return true;
 }
 
-bool player_enter(GameManager *game_manager, int move_by) {
-  if (!is_enter_legal(game_manager, move_by))
+bool player_enter(WinManager *win_manager, GameManager *game_manager,
+                  int move_by) {
+  if (!is_enter_legal_forced(win_manager, game_manager, move_by))
     return false;
 
   int from = PLAYER_BAR_POS(game_manager->curr_player);
@@ -1019,12 +1125,12 @@ int legal_enters_count(GameManager *game_manager) {
   int v1 = game_manager->dice_roll.v1;
   int v2 = game_manager->dice_roll.v2;
   if (v1 == v2) {
-    if (is_enter_legal(game_manager, v1))
+    if (is_enter_legal_basic(game_manager, v1))
       count = MAX_DOUBLET_USES;
   } else {
-    if (is_enter_legal(game_manager, v1))
+    if (is_enter_legal_basic(game_manager, v1))
       count++;
-    if (is_enter_legal(game_manager, v2))
+    if (is_enter_legal_basic(game_manager, v2))
       count++;
   }
   if (count > checker_count)
@@ -1045,9 +1151,9 @@ bool any_move_legal(GameManager *game_manager) {
   for (int i = 0; i < BOARD_SIZE; i++) {
     if (checker_kind_at(&game_manager->board, i) != curr_player)
       continue;
-    if (is_move_legal(game_manager, i, v1))
+    if (is_move_legal_basic(game_manager, i, v1))
       return true;
-    if (v1 != v2 && is_move_legal(game_manager, i, v2))
+    if (v1 != v2 && is_move_legal_basic(game_manager, i, v2))
       return true;
   }
   return false;
@@ -1179,15 +1285,16 @@ bool make_move_loop(WinManager *win_manager, GameManager *game_manager) {
   bool legal = false;
   int by, from;
   while (!legal) {
+    // clear_refresh_win(&win_manager->io_win);
     by = -1;
     from = -1;
     bool quit = move_input(win_manager, &from, &by);
     if (quit)
       return true;
 
-    legal = player_move(game_manager, from, by);
+    legal = player_move(win_manager, game_manager, from, by);
 
-    clear_refresh_win(&win_manager->io_win);
+    refresh_win(&win_manager->io_win);
   }
   use_roll_val(&game_manager->dice_roll, by);
 
@@ -1205,7 +1312,7 @@ bool make_enter_move_loop(WinManager *win_manager, GameManager *game_manager) {
       return true;
 
     legal = can_use_roll_val(&game_manager->dice_roll, val) &&
-            player_enter(game_manager, val);
+            player_enter(win_manager, game_manager, val);
 
     clear_refresh_win(&win_manager->io_win);
   }
@@ -1330,7 +1437,8 @@ bool load_game(WinManager *win_manager, GameManager *game_manager) {
 bool play_load_game(WinManager *win_manager) {
   GameManager game_manager;
 
-  load_game(win_manager, &game_manager);
+  if (!load_game(win_manager, &game_manager))
+    return false;
   game_loop(win_manager, &game_manager, true);
 
   return true;
@@ -1367,6 +1475,7 @@ void watch_menu_loop(WinManager *win_manager) {
   GameManager game_manager, end_game;
   if (!init_watch_menu(win_manager, &game_manager, &end_game))
     return;
+  clear_refresh_win(&win_manager->io_win);
 
   while (true) {
     display_game(win_manager, &game_manager);
