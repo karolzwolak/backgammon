@@ -1415,8 +1415,14 @@ bool check_handle_win(WinManager *win_manager, GameManager *game_manager) {
   return true;
 }
 
-bool save_game(WinManager *win_manager, GameManager *game_manager) {
-  return serialize_game(game_manager, "test.txt");
+void save_game(WinManager *win_manager, GameManager *game_manager) {
+  char filename[MAX_INPUT_LEN] = "";
+  prompt_input(&win_manager->io_win, "Save to file: ", filename);
+  if (filename[0] == '\0')
+    return;
+  if (!serialize_game(game_manager, filename)) {
+    printf_centered_nl(&win_manager->io_win, "Failed to access '%s'", filename);
+  }
 }
 
 void game_loop(WinManager *win_manager, GameManager *game_manager,
@@ -1424,9 +1430,11 @@ void game_loop(WinManager *win_manager, GameManager *game_manager,
   enable_cursor();
   clear_refresh_win(&win_manager->io_win);
 
+  bool save = false;
   while (true) {
     display_game(win_manager, game_manager);
     if (play_turn(win_manager, game_manager, resume)) {
+      save = true;
       break;
     }
     if (check_handle_win(win_manager, game_manager))
@@ -1434,9 +1442,13 @@ void game_loop(WinManager *win_manager, GameManager *game_manager,
     resume = false;
   }
 
-  save_game(win_manager, game_manager);
   clear_refresh_win(&win_manager->io_win);
   clear_refresh_win(&win_manager->stats_win);
+  clear_refresh_win(&win_manager->content_win);
+
+  if (save)
+    save_game(win_manager, game_manager);
+
   disable_cursor();
 
   free_game_manager(game_manager);
