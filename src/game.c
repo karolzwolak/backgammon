@@ -124,12 +124,6 @@ bool dice_roll_used(DiceRoll *dice_roll) {
 }
 
 typedef struct {
-  char *name;
-  CheckerKind checker_kind;
-  int score;
-} Player;
-
-typedef struct {
   CheckerKind checker_kind;
   int checker_count;
 } BoardPoint;
@@ -1555,7 +1549,6 @@ void play_menu_loop(WinManager *win_manager) {
       play_new_game(win_manager);
       return;
     case 'a':
-      add_one_player(15, "test");
       break;
     case 'q':
       return;
