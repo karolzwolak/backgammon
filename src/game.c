@@ -1487,8 +1487,30 @@ bool play_new_game(WinManager *win_manager) {
 
 void resume_game_from_watch(WinManager *win_manager,
                             GameManager *game_manager) {
+  clear_refresh_win(&win_manager->legend_win);
   trav_delete_next_moves(&game_manager->turn_log);
   game_loop(win_manager, game_manager, true);
+}
+
+void print_legend(WinWrapper *legend_win, const char *str) {
+  move_rel(legend_win, 1, 0);
+  printf_centered_nl(legend_win, str);
+}
+
+void display_quit_legend(WinWrapper *legend_win) {
+  clear_win(legend_win);
+  print_legend(legend_win, "q quit");
+  refresh_win(legend_win);
+}
+
+void display_watch_legend(WinWrapper *legend_win) {
+  display_quit_legend(legend_win);
+  print_legend(legend_win, "p prev move");
+  print_legend(legend_win, "n next move");
+  print_legend(legend_win, "r resume");
+  print_legend(legend_win, "a goto start");
+  print_legend(legend_win, "z goto end");
+  refresh_win(legend_win);
 }
 
 bool init_watch_menu(WinManager *win_manager, GameManager *game_manager,
@@ -1497,6 +1519,8 @@ bool init_watch_menu(WinManager *win_manager, GameManager *game_manager,
   if (!load_game(win_manager, game_manager)) {
     return false;
   }
+
+  display_watch_legend(&win_manager->legend_win);
   *end_game = *game_manager;
   trav_apply_to_start(game_manager);
   return true;
@@ -1537,6 +1561,7 @@ void watch_menu_loop(WinManager *win_manager) {
 
 void play_menu_loop(WinManager *win_manager) {
 
+  display_quit_legend(&win_manager->legend_win);
   clear_refresh_win(&win_manager->io_win);
   while (true) {
     display_play_menu(win_manager);

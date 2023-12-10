@@ -121,10 +121,12 @@ void menu_loop(WinManager *win_manager) {
       play_menu_loop(win_manager);
       clear_refresh_win(&win_manager->stats_win);
       clear_refresh_win(&win_manager->io_win);
+      clear_refresh_win(&win_manager->legend_win);
       break;
     case 'w':
       watch_menu_loop(win_manager);
       clear_refresh_win(&win_manager->stats_win);
+      clear_refresh_win(&win_manager->legend_win);
       break;
     default:
       break;
