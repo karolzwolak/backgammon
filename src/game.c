@@ -780,14 +780,22 @@ int enter_dest(CheckerKind checker_kind, int move_by) {
                          out_start(opposite_checker(checker_kind)), move_by);
 }
 
-int move_dest(GameManager *game_manager, int from, int move_by) {
+int move_dest_checker_kind(CheckerKind checker_kind, int from, int move_by) {
   if (from == WHITE_BAR_POS) {
     return enter_dest(White, move_by);
   } else if (from == RED_BAR_POS) {
     return enter_dest(Red, move_by);
   }
-  return checker_move_by(checker_kind_at(&game_manager->board, from), from,
-                         move_by);
+  return checker_move_by(checker_kind, from, move_by);
+}
+
+int move_dest(GameManager *game_manager, int from, int move_by) {
+  return move_dest_checker_kind(checker_kind_at(&game_manager->board, from),
+                                from, move_by);
+}
+
+int move_dest_rev(GameManager *game_manager, int from, int move_by) {
+  return move_dest_checker_kind(game_manager->curr_player, from, move_by);
 }
 
 // returns true if there was definitive answer
@@ -1022,9 +1030,11 @@ void apply_move_entry(MoveEntry *move_entry, GameManager *game_manager,
                       bool reverse) {
   int from = move_entry->from;
   int by = move_entry->by;
+
   int dest = move_dest(game_manager, from, by);
 
   if (reverse) {
+    dest = move_dest_rev(game_manager, from, by);
     move_checker(game_manager, from, dest, reverse);
     reverse_use_roll_val(&game_manager->dice_roll, by);
   }
