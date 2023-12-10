@@ -1484,13 +1484,6 @@ bool play_new_game(WinManager *win_manager) {
   return true;
 }
 
-void resume_game_from_watch(WinManager *win_manager,
-                            GameManager *game_manager) {
-  clear_refresh_win(&win_manager->legend_win);
-  trav_delete_next_moves(&game_manager->turn_log);
-  game_loop(win_manager, game_manager, true);
-}
-
 void print_legend(WinWrapper *legend_win, const char *str) {
   move_rel(legend_win, 1, 0);
   printf_centered_nl(legend_win, str);
@@ -1510,6 +1503,14 @@ void display_watch_legend(WinWrapper *legend_win) {
   print_legend(legend_win, "a goto start");
   print_legend(legend_win, "z goto end");
   refresh_win(legend_win);
+}
+
+void resume_game_from_watch(WinManager *win_manager,
+                            GameManager *game_manager) {
+  clear_refresh_win(&win_manager->legend_win);
+  display_quit_legend(&win_manager->legend_win);
+  trav_delete_next_moves(&game_manager->turn_log);
+  game_loop(win_manager, game_manager, true);
 }
 
 bool init_watch_menu(WinManager *win_manager, GameManager *game_manager,
